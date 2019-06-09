@@ -1,0 +1,12 @@
+# Python Compile Files
+__pycache__/
+
+# VIM Temporary files
+.*.swp
+.*.swo
+
+# Virtual Environments
+env/
+
+# Logs
+*.log
