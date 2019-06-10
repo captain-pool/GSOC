@@ -12,7 +12,7 @@ flags.DEFINE_string("tpu", None, "TPU Address")
 flags.DEFINE_integer("iterations", 2, "Number of Itertions")
 flags.DEFINE_integer("batch_size", 10, "Size of eahc Batch")
 flags.DEFINE_boolean("use_tpu", True, " Use TPU")
-flags.define_boolean("use_compat", True, "Use OptimizerV1 from compat module")
+flags.DEFINE_boolean("use_compat", True, "Use OptimizerV1 from compat module")
 flags.DEFINE_string(
     "model_dir",
     "model_dir/",
