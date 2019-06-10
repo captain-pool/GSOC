@@ -27,7 +27,6 @@ if not os.path.exists("shufflenet.pb"):
   tf_rep.export_graph("shufflenet.pb")
 
 
-
 def module_fn():
   input_name = "gpu_0/data_0:0"
   output_name = "Softmax:0"
@@ -35,14 +34,16 @@ def module_fn():
   with tf.gfile.GFile("shufflenet.pb", 'rb') as f:
     graph_def.ParseFromString(f.read())
   input_tensor = tf.placeholder(tf.float32, shape=[1, 3, 224, 224])
-  output_tensor, = tf.import_graph_def(graph_def, input_map={input_name: input_tensor}, return_elements=[output_name])
+  output_tensor, = tf.import_graph_def(
+      graph_def, input_map={
+          input_name: input_tensor}, return_elements=[output_name])
   hub.add_signature(inputs=input_tensor, outputs=output_tensor)
 
+def main():
+  spec = hub.create_module_spec(module_fn)
+  module = hub.Module(spec)
+  with tf.Session() as sess:
+    module.export("onnx/shufflenet/1", sess)
 
-spec = hub.create_module_spec(module_fn)
-module = hub.Module(spec)
-
-
-with tf.Session() as sess:
-  module.export("onnx/shufflenet/1", sess)
-
+if __name__ == "__main__":
+  main()
