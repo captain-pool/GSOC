@@ -6,7 +6,7 @@ ShuffleNet ONNX to Tensorflow Hub Module Export
 
 **Original Paper**: [ShuffleNet: An Extremely Efficient Convolutional Neural Network for Mobile Devices](https://arxiv.org/abs/1707.01083)
 
-## Module Properties:
+## Module Properties
 1. Load as **Channel First**
 2. Input Shape: [1, 3, 224, 224]
 2. Output Shape: [1, 1000]
@@ -15,6 +15,7 @@ ShuffleNet ONNX to Tensorflow Hub Module Export
 ## Steps
 - `pip install -r requirements.txt`
 - `python3 export.py`
+
  The Tensorflow Hub Module is Exported as *onnx/shufflenet/1*
 
 ## Load and Use Model
