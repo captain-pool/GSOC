@@ -23,5 +23,5 @@ ShuffleNet ONNX to Tensorflow Hub Module Export
  ```python3
  import tensorflow_hub as hub
  module = hub.load("onnx/shufflenet/1")
- class = module(...)
+ result = module(...)
  ```
