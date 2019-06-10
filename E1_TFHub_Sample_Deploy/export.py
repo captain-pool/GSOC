@@ -32,17 +32,8 @@ class MNIST(tf.keras.models.Model):
     return output
 
 
-model = MNIST()
-train, test = tfds.load("mnist", split=["train", "test"])
-optimizer_fn = tf.optimizers.Adam(learning_rate=1e-3)
-loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-metric = tf.keras.metrics.Mean()
-model.compile(optimizer_fn, loss=loss_fn)
-train = train.shuffle(1, reshuffle_each_iteration=True).batch(16)
-
-
 @tf.function
-def train_step(image, label):
+def train_step(model, loss_fn, optimizer_fn, metric, image, label):
   with tf.GradientTape() as tape:
     preds = model(image)
     label_onehot = tf.one_hot(label, 10)
@@ -58,10 +49,30 @@ def test(image, label):
   label_onehot = tf.one_hot(label, 10)
 
 
-for epoch in range(10):
-  for step, data in enumerate(train):
-    train_step(data['image'], data['label'])
-    if step % 100 == 0:
-      print("Epoch #{}::\tStep #{}:\tLoss: {}".format(
-          epoch, step, metric.result().numpy()))
-tf.saved_model.save(model, "/tmp/tfhub_modules/mnist/digits/1")
+def main():
+  model = MNIST()
+  train, test = tfds.load("mnist", split=["train", "test"])
+  optimizer_fn = tf.optimizers.Adam(learning_rate=1e-3)
+  loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+  metric = tf.keras.metrics.Mean()
+  model.compile(optimizer_fn, loss=loss_fn)
+  train = train.shuffle(1, reshuffle_each_iteration=True).batch(16)
+  # Training Loop
+  for epoch in range(10):
+    for step, data in enumerate(train):
+      train_step(
+          model,
+          loss_fn,
+          optimizer_fn,
+          metric,
+          data['image'],
+          data['label'])
+      if step % 100 == 0:
+        print("Epoch: #{}\tStep: #{}\tLoss: {}".format(
+            epoch, step, metric.result().numpy()))
+  # Exporting Model as SavedModel 2.0
+  tf.saved_model.save(model, "/tmp/tfhub_modules/mnist/digits/1")
+
+
+if __name__ == "__main__":
+  main()

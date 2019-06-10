@@ -11,20 +11,27 @@ import tarfile
 DOWNLOAD_LINK = "https://s3.amazonaws.com/download.onnx/models/opset_8/shufflenet.tar.gz"
 
 
-if not os.path.exists(DOWNLOAD_LINK.split("/")[-1]):
-  response = requests.get(DOWNLOAD_LINK, stream=True)
-  with open(DOWNLOAD_LINK.split("/")[-1], "wb") as handle:
-    for data in tqdm(response.iter_content(chunk_size=io.DEFAULT_BUFFER_SIZE)):
-      handle.write(data)
-  tar = tarfile.open(DOWNLOAD_LINK.split("/")[-1])
-  tar.extractall()
-  tar.close()
-
-
-if not os.path.exists("shufflenet.pb"):
-  model = onnx.load("shufflenet/model.onnx")
-  tf_rep = prepare(model)
-  tf_rep.export_graph("shufflenet.pb")
+def load_shufflenet():
+  # Download Shufflenet if it doesn't exist
+  if not os.path.exists(DOWNLOAD_LINK.split("/")[-1]):
+    response = requests.get(DOWNLOAD_LINK, stream=True)
+    with open(DOWNLOAD_LINK.split("/")[-1], "wb") as handle:
+      for data in tqdm(
+              response.iter_content(
+                  chunk_size=io.DEFAULT_BUFFER_SIZE),
+              total=int(
+                  response.headers['Content-length']) //
+              io.DEFAULT_BUFFER_SIZE,
+              desc="Downloading"):
+        handle.write(data)
+    tar = tarfile.open(DOWNLOAD_LINK.split("/")[-1])
+    tar.extractall()
+    tar.close()
+  # Export Protobuf File if not present
+  if not os.path.exists("shufflenet.pb"):
+    model = onnx.load("shufflenet/model.onnx")
+    tf_rep = prepare(model)
+    tf_rep.export_graph("shufflenet.pb")
 
 
 def module_fn():
@@ -39,11 +46,15 @@ def module_fn():
           input_name: input_tensor}, return_elements=[output_name])
   hub.add_signature(inputs=input_tensor, outputs=output_tensor)
 
+
 def main():
+  load_shufflenet()
   spec = hub.create_module_spec(module_fn)
   module = hub.Module(spec)
   with tf.Session() as sess:
     module.export("onnx/shufflenet/1", sess)
+  print("Exported")
+
 
 if __name__ == "__main__":
   main()

@@ -120,8 +120,9 @@ def main(_):
       input_fn=lambda params: input_fn(
           mode=tf.estimator.ModeKeys.TRAIN,
           **params),
-      max_steps=1000)  
-  #TODO(@captain-pool): Implement Evaluation 
+      max_steps=1000)
+  # TODO(@captain-pool): Implement Evaluation
+
 
 if __name__ == "__main__":
   app.run(main)
