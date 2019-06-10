@@ -9,7 +9,7 @@ from tqdm import tqdm
 import tarfile
 
 DOWNLOAD_LINK = "https://s3.amazonaws.com/download.onnx/models/opset_8/shufflenet.tar.gz"
-
+SHUFFLENET_PB = "shufflenet.pb"
 
 def load_shufflenet():
   # Download Shufflenet if it doesn't exist
@@ -28,17 +28,17 @@ def load_shufflenet():
     tar.extractall()
     tar.close()
   # Export Protobuf File if not present
-  if not os.path.exists("shufflenet.pb"):
+  if not os.path.exists(SHUFFLENET_PB):
     model = onnx.load("shufflenet/model.onnx")
     tf_rep = prepare(model)
-    tf_rep.export_graph("shufflenet.pb")
+    tf_rep.export_graph(SHUFFLENET_PB)
 
 
 def module_fn():
   input_name = "gpu_0/data_0:0"
   output_name = "Softmax:0"
   graph_def = tf.GraphDef()
-  with tf.gfile.GFile("shufflenet.pb", 'rb') as f:
+  with tf.gfile.GFile(SHUFFLENET_PB, 'rb') as f:
     graph_def.ParseFromString(f.read())
   input_tensor = tf.placeholder(tf.float32, shape=[1, 3, 224, 224])
   output_tensor, = tf.import_graph_def(
