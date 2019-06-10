@@ -12,6 +12,7 @@ flags.DEFINE_string("tpu", None, "TPU Address")
 flags.DEFINE_integer("iterations", 2, "Number of Itertions")
 flags.DEFINE_integer("batch_size", 10, "Size of eahc Batch")
 flags.DEFINE_boolean("use_tpu", True, " Use TPU")
+flags.define_boolean("use_compat", True, "Use OptimizerV1 from compat module")
 flags.DEFINE_string(
     "model_dir",
     "model_dir/",
@@ -61,7 +62,11 @@ def model_fn(features, labels, mode, params):
   ])
   optimizer = None
   if mode == tf.estimator.ModeKeys.TRAIN:
-    optimizer = tf.optimizers.Adam(params.get("learing_rate", 1e-3))
+    if not params["use_compat"]:
+      optimizer = tf.optimizers.Adam(params.get("learning_rate", 1e-3))
+    else:
+      optimizer = tf.compat.v1.train.AdamOptimizer(
+          params.get("learning_rate", 1e-3))
     if params.get("use_tpu", True):
       optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
 
@@ -77,19 +82,27 @@ def model_fn(features, labels, mode, params):
   if mode == tf.estimator.ModeKeys.EVAL:
     return tpu_estimator.TPUEstimatorSpec(mode, loss=loss)
 
-  def train_fn():
+  def train_fn(use_compat):
     assert optimizer is not None
     gradient = tape.gradient(loss, model.trainable_variables)
     global_step = tf.compat.v1.train.get_global_step()
-    update_global_step = tf.compat.v1.assign(
-        global_step, global_step + 1, name='update_global_step')
-    with tf.control_dependencies([update_global_step]):
+    apply_grads = tf.no_op()  # Does Nothing. Initialization only. None would also work
+    if not use_compat:
+      update_global_step = tf.compat.v1.assign(
+          global_step, global_step + 1, name='update_global_step')
+      with tf.control_dependencies([update_global_step]):
+        apply_grads = optimizer.apply_gradients(
+            zip(gradient, model.trainable_variables))
+    else:
       apply_grads = optimizer.apply_gradients(
-          zip(gradient, model.trainable_variables))
+          zip(gradient, model_trainable_variables),
+          global_step=global_step)
     return apply_grads
 
   if mode == tf.estimator.ModeKeys.TRAIN:
-    return tpu_estimator.TPUEstimatorSpec(mode, loss=loss, train_op=train_fn())
+    return tpu_estimator.TPUEstimatorSpec(
+        mode, loss=loss, train_op=train_fn(
+            params['use_compat']))
 
 
 def main(_):
@@ -112,7 +125,8 @@ def main(_):
       params={
           "use_tpu": FLAGS.use_tpu,
           "data_dir": FLAGS.data_dir,
-          "dataset": FLAGS.dataset
+          "dataset": FLAGS.dataset,
+          "use_compat": FLAGS.use_compat
       }
   )
 
