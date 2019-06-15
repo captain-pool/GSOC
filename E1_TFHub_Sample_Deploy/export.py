@@ -1,10 +1,17 @@
+import sys
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
+from absl import app, flags
 """ Create a Sample TF-Hub Module using SavedModel v2.0
 The module has as a single signature which loads MNIST Dataset from TFDS and train a simple Neural Network for classifying the digits. The model is built and trained using Tewnsorlfow
 """
-
+FLAGS = flags.FLAGS
+flags.DEFINE_string("path", "/tmp/tfhub_modules/mnist/digits/1", "Path to export the module")
+flags.DEFINE_string("data_dir", None, "Path to Custom TFDS Data Directory")
+flags.DEFINE_integer("buffer_size", 1000, "Buffer Size to Use while Shuffling the Dataset")
+flags.DEFINE_integer("batch_size", 32, "Size of each batch")
+flags.DEFINE_integer("epoch", 10, "Number of iterations")
 
 class MNIST(tf.keras.models.Model):
   def __init__(self, output_activation="softmax"):
@@ -42,23 +49,19 @@ def train_step(model, loss_fn, optimizer_fn, metric, image, label):
   optimizer_fn.apply_gradients(zip(grads, model.trainable_variables))
   metric(loss_)
 
-
-@tf.function
-def test(image, label):
-  preds = model(image)
-  label_onehot = tf.one_hot(label, 10)
-
-
-def main():
+def main(_):
   model = MNIST()
-  train, test = tfds.load("mnist", split=["train", "test"])
+  kwargs = {}
+  if FLAGS.data_dir:
+    kwargs = {"data_dir": FLAGS.data_dir}
+  train = tfds.load("mnist", split="train", **kwargs)
   optimizer_fn = tf.optimizers.Adam(learning_rate=1e-3)
   loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
   metric = tf.keras.metrics.Mean()
   model.compile(optimizer_fn, loss=loss_fn)
-  train = train.shuffle(1, reshuffle_each_iteration=True).batch(16)
+  train = train.shuffle(FLAGS.buffer_size, reshuffle_each_iteration=True).batch(FLAGS.batch_size)
   # Training Loop
-  for epoch in range(10):
+  for epoch in range(FLAGS.epoch):
     for step, data in enumerate(train):
       train_step(
           model,
@@ -67,12 +70,11 @@ def main():
           metric,
           data['image'],
           data['label'])
-      if step % 100 == 0:
-        print("Epoch: #{}\tStep: #{}\tLoss: {}".format(
+      sys.stdout.write("\rEpoch: #{}\tStep: #{}\tLoss: {}".format(
             epoch, step, metric.result().numpy()))
   # Exporting Model as SavedModel 2.0
-  tf.saved_model.save(model, "/tmp/tfhub_modules/mnist/digits/1")
+  tf.saved_model.save(model, FLAGS.path)
 
 
 if __name__ == "__main__":
-  main()
+  app.run(main)
