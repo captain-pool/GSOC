@@ -2,16 +2,12 @@ import sys
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
-from absl import app, flags
+import argparse
 """ Create a Sample TF-Hub Module using SavedModel v2.0
 The module has as a single signature which loads MNIST Dataset from TFDS and train a simple Neural Network for classifying the digits. The model is built and trained using Tewnsorlfow
 """
-FLAGS = flags.FLAGS
-flags.DEFINE_string("path", "/tmp/tfhub_modules/mnist/digits/1", "Path to export the module")
-flags.DEFINE_string("data_dir", None, "Path to Custom TFDS Data Directory")
-flags.DEFINE_integer("buffer_size", 1000, "Buffer Size to Use while Shuffling the Dataset")
-flags.DEFINE_integer("batch_size", 32, "Size of each batch")
-flags.DEFINE_integer("epoch", 10, "Number of iterations")
+FLAGS = None
+
 
 class MNIST(tf.keras.models.Model):
   def __init__(self, output_activation="softmax"):
@@ -49,19 +45,28 @@ def train_step(model, loss_fn, optimizer_fn, metric, image, label):
   optimizer_fn.apply_gradients(zip(grads, model.trainable_variables))
   metric(loss_)
 
-def main(_):
+
+def train_and_export(
+        data_dir=None,
+        buffer_size=1000,
+        batch_size=32,
+        epoch=10,
+        export_path="/tmp/tfhub_modules/mnist/digits/1"):
   model = MNIST()
   kwargs = {}
-  if FLAGS.data_dir:
-    kwargs = {"data_dir": FLAGS.data_dir}
+  if data_dir:
+    kwargs["data_dir"] = data_dir
   train = tfds.load("mnist", split="train", **kwargs)
   optimizer_fn = tf.optimizers.Adam(learning_rate=1e-3)
   loss_fn = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
   metric = tf.keras.metrics.Mean()
   model.compile(optimizer_fn, loss=loss_fn)
-  train = train.shuffle(FLAGS.buffer_size, reshuffle_each_iteration=True).batch(FLAGS.batch_size)
+  train = train.shuffle(
+      buffer_size,
+      reshuffle_each_iteration=True).batch(
+      batch_size)
   # Training Loop
-  for epoch in range(FLAGS.epoch):
+  for epoch in range(epoch):
     for step, data in enumerate(train):
       train_step(
           model,
@@ -71,10 +76,34 @@ def main(_):
           data['image'],
           data['label'])
       sys.stdout.write("\rEpoch: #{}\tStep: #{}\tLoss: {}".format(
-            epoch, step, metric.result().numpy()))
+          epoch, step, metric.result().numpy()))
   # Exporting Model as SavedModel 2.0
-  tf.saved_model.save(model, FLAGS.path)
+  tf.saved_model.save(model, export_path)
 
 
 if __name__ == "__main__":
-  app.run(main)
+  parser = argparse.ArgumentParser()
+  parser.add_argument(
+      "--export_path",
+      type=str,
+      default="/tmp/tfhub_modules/mnist/digits/1",
+      help="Path to export the module")
+  parser.add_argument("--data_dir", type=str, default=None,
+                      help="Path to Custom TFDS Data Directory")
+  parser.add_argument(
+      "--buffer_size",
+      type=int,
+      default=1000,
+      help="Buffer Size to Use while Shuffling the Dataset")
+  parser.add_argument(
+      "--batch_size",
+      type=int,
+      default=32,
+      help="Size of each batch")
+  parser.add_argument(
+      "--epoch",
+      type=int,
+      default=10,
+      help="Number of iterations")
+  FLAGS, unparsed = parser.parse_known_args()
+  train_and_export(**vars(FLAGS))

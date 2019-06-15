@@ -3,27 +3,15 @@ import numpy as np
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 import unittest
-from absl import app, flags
+import argparse
 
-flags.DEFINE_string(
-    "exported_path",
-    "/tmp/tfhub_modules/mnist/digits/1",
-    "Path to exported Module")
-flags.DEFINE_string("data_dir", None, "Path to TFDS Dataset Directory")
-flags.DEFINE_boolean("check_accuracy", False, "Checks the accuracy of a model")
-flags.DEFINE_integer("batch_size", 32, "Batch size for checking accuracy")
-flags.DEFINE_integer(
-    "buffer_size",
-    1000,
-    "Buffer size used for Data Shuffling")
-FLAGS = flags.FLAGS
-
+FLAGS = None
 
 class TFHubMNISTTest(tf.test.TestCase):
   def setUp(self):
     kwargs = {}
     if FLAGS.data_dir:
-      kwargs = {"data_dir": FLAGS.data_dir}
+      kwargs["data_dir"] = FLAGS.data_dir
     self.dataset = tfds.load("mnist",
                              split="test",
                              **kwargs).shuffle(FLAGS.buffer_size,
@@ -52,4 +40,11 @@ class TFHubMNISTTest(tf.test.TestCase):
 
 
 if __name__ == '__main__':
-  app.run(lambda _: tf.test.main())
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--exported_path", type=str, default="/tmp/tfhub_modules/mnist/digits/1",help="Path to exported Module")
+  parser.add_argument("--data_dir", type=str, default=None, help="Path to TFDS Dataset Directory")
+  parser.add_argument("--check_accuracy", type=bool, default=False,help="Path to TFDS Dataset Directory")
+  parser.add_argument("--batch_size", type=int, default=32, help="Batch size for checking accuracy")
+  parser.add_argument("--buffer_size", type=int, default=1000, help="Buffer size used for Data Shuffling")
+  FLAGS, unk = parser.parse_known_args()
+  tf.test.main()
