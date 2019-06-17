@@ -38,7 +38,7 @@ class TFHubMNISTTest(tf.test.TestCase):
     train_and_export(epoch=1, export_path="%s/model/1" % TMPDIR)
     self.assertTrue(os.listdir(TMPDIR))
 
-  def test_model_loadable(self):
+  def test_empty_input(self):
     if not os.path.exists("%s/model/1" % TMPDIR):
       self.test_model_exporting()
     model = load_model("%s/model/1" % TMPDIR)
@@ -55,6 +55,7 @@ class TFHubMNISTTest(tf.test.TestCase):
         tf.argmax(
             tf.squeeze(prediction)).numpy(),
         self.test_label)
+
   @classmethod
   def tearDownClass(cls):
     shutil.rmtree(TMPDIR)
