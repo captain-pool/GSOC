@@ -2,6 +2,7 @@ import tensorflow as tf
 import tensorflow_hub as hub
 import unittest
 import tempfile
+import shutil
 import os
 from absl.testing import absltest
 import export
@@ -54,7 +55,9 @@ class TFHubMNISTTest(tf.test.TestCase):
         tf.argmax(
             tf.squeeze(prediction)).numpy(),
         self.test_label)
-
+  @classmethod
+  def tearDownClass(cls):
+    shutil.rmtree(TMPDIR)
 
 if __name__ == '__main__':
   tf.test.main()
