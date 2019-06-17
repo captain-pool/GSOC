@@ -22,6 +22,18 @@ git_repository(
     remote = "https://github.com/tensorflow/hub.git",
 )
 
+bind(
+    name = "tensorflow_hub",
+    actual = "@org_tensorflow_hub//tensorflow_hub:tensorflow_hub"
+)
+bind(
+    name = "expect_tensorflow_installed",
+    actual = "@org_tensorflow_hub//tensorflow_hub:expect_tensorflow_installed"
+)
+bind(
+    name = "expect_numpy_installed",
+    actual = "@org_tensorflow_hub//tensorflow_hub:expect_numpy_installed"
+)
 git_repository(
     name = "protobuf_bzl",
     # v3.6.1.3

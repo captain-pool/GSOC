@@ -9,6 +9,8 @@ py_library(
     name = "export_lib",
     srcs = ["export.py"],
     srcs_version = "PY2AND3",
+    deps = ["//external:expect_numpy_installed",
+    "//external:tensorflow_hub"]
 )
 py_test(
     name = "export_test",
@@ -16,11 +18,9 @@ py_test(
     data = glob(["test_data/*.jpg"]),
     python_version = "PY3",
     srcs_version = "PY2AND3",
-    deps = [":export_lib", ":numpy_installed", ":tensorflow_installed"]
+    deps = [":export_lib",
+    "//external:tensorflow_hub",
+    "//external:expect_numpy_installed",
+    "//external:expect_tensorflow_installed"]
 )
-py_library(
-    name = "numpy_installed"
-)
-py_library(
-    name = "tensorflow_installed"
-)
+
