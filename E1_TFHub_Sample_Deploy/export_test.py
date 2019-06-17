@@ -29,14 +29,14 @@ class TFHubMNISTTest(tf.test.TestCase):
 
   def test_model_exporting(self):
     mocked_dict = export.sys.__dict__.copy()
-    devnull = open(os.devnull, "w")
-    mocked_dict["stdout"] = devnull
-    absltest.mock.patch.dict(
-        export.sys.__dict__,
-        mocked_dict,
-        clear=True).start()
-    train_and_export(epoch=1, export_path="%s/model/1" % TMPDIR)
-    self.assertTrue(os.listdir(TMPDIR))
+    with open(os.devnull, "w") as devnull:
+      mocked_dict["stdout"] = devnull
+      absltest.mock.patch.dict(
+          export.sys.__dict__,
+          mocked_dict,
+          clear=True).start()
+      train_and_export(epoch=1, export_path="%s/model/1" % TMPDIR)
+      self.assertTrue(os.listdir(TMPDIR))
 
   def test_empty_input(self):
     if not os.path.exists("%s/model/1" % TMPDIR):
