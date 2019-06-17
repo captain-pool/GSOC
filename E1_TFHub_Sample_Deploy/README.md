@@ -4,6 +4,5 @@ Sample MNIST Graph to export as Tensorflow Hub Module
 ```bash
 $ python3 export.py
 ```
-### To Run Predictions
-- `$ python3 test.py`
-- open **output.jpg**
+### to run The Tests
+- `$ bazel test E1_TFHub_Sample_Deploy:export_test`

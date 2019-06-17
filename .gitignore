@@ -10,3 +10,6 @@ env/
 
 # Logs
 *.log
+
+#bazel files and symlinks
+bazel-*

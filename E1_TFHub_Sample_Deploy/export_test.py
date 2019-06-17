@@ -10,7 +10,7 @@ from export import train_and_export
 
 TMPDIR = tempfile.mkdtemp()
 model = None
-
+TEST_DATA_DIR = "E1_TFHub_Sample_Deploy/test_data"
 
 def load_model(path):
   global model
@@ -21,7 +21,7 @@ def load_model(path):
 
 class TFHubMNISTTest(tf.test.TestCase):
   def setUp(self):
-    file_ = tf.gather(tf.io.matching_files("test_data/*.jpg"), 0)
+    file_ = tf.gather(tf.io.matching_files("%s/*.jpg" % TEST_DATA_DIR), 0)
     self.test_image = tf.expand_dims(
         tf.image.decode_jpeg(
             tf.io.read_file(file_)), 0)
