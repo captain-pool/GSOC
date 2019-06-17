@@ -10,7 +10,14 @@ FLAGS = None
 
 
 class MNIST(tf.keras.models.Model):
+  """Model class for MNIST Classifier
+  """
+
   def __init__(self, output_activation="softmax"):
+    """
+    Args:
+      output_activation (str): activation for last layer
+    """
     super(MNIST, self).__init__()
     self.layer_1 = tf.keras.layers.Dense(64)
     self.layer_2 = tf.keras.layers.Dense(10, activation=output_activation)
@@ -35,8 +42,16 @@ class MNIST(tf.keras.models.Model):
     return output
 
 
-@tf.function
 def train_step(model, loss_fn, optimizer_fn, metric, image, label):
+  """ Trains the model
+    Args:
+      model: Keras Model to train
+      loss_fn: Loss Function to use
+      optimizer_fn: Optimizer function to use
+      metric: keras.metric to use
+      image: shape[batch_size, width, height, num_channels] Tensor of Training Images
+      label: shape[batch_size,] Image classes as returned by TFDS
+  """
   with tf.GradientTape() as tape:
     preds = model(image)
     label_onehot = tf.one_hot(label, 10)
@@ -52,6 +67,14 @@ def train_and_export(
         batch_size=32,
         epoch=10,
         export_path="/tmp/tfhub_modules/mnist/digits/1"):
+  """
+    Trains and export the Model as SavedModel 2.0
+    Args:
+      data_dir (str): Directory where to store datasets from TFDS (With proper authentication, Cloud Bucket Supported)
+      buffer_size (int): Size of Buffer to use while shuffling
+      batch_size (int): size of each training batch
+      export_path (str): path to export the trained model
+  """
   model = MNIST()
   kwargs = {}
   if data_dir:
