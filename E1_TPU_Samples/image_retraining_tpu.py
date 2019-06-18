@@ -95,7 +95,7 @@ def model_fn(features, labels, mode, params):
             zip(gradient, model.trainable_variables))
     else:
       apply_grads = optimizer.apply_gradients(
-          zip(gradient, model_trainable_variables),
+          zip(gradient, model.trainable_variables),
           global_step=global_step)
     return apply_grads
 
