@@ -46,7 +46,7 @@ class TFHubMNISTTest(tf.test.TestCase):
         tf.zeros([1, 28, 28, 1], dtype=tf.uint8).numpy())
     self.assertEqual(output_.shape, [1, 10])
 
-  def test_model_working(self):
+  def test_sample_input(self):
     if not os.path.exists(os.path.join(TMPDIR, "model/1")):
       self.test_model_exporting()
     model = load_model("%s/model/1" % TMPDIR)
