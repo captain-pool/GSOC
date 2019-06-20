@@ -14,6 +14,7 @@ flags.DEFINE_integer("batch_size", 16, "Size of each Batch")
 flags.DEFINE_float("learning_rate", 1e-3, "Learning Rate")
 flags.DEFINE_boolean("use_tpu", True, " Use TPU")
 flags.DEFINE_boolean("use_compat", True, "Use OptimizerV1 from compat module")
+flags.DEFINE_integer("max_steps", 1000, "Maximum Number of Steps for TPU Estimator")
 flags.DEFINE_string(
     "model_dir",
     "model_dir/",
@@ -67,7 +68,7 @@ def model_fn(features, labels, mode, params):
     else:
       optimizer = tf.compat.v1.train.AdamOptimizer(
           params["learning_rate"])
-    if params.get["use_tpu"]:
+    if params["use_tpu"]:
       optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
 
   with tf.GradientTape() as tape:
@@ -95,7 +96,7 @@ def model_fn(features, labels, mode, params):
             zip(gradient, model.trainable_variables))
     else:
       apply_grads = optimizer.apply_gradients(
-          zip(gradient, model_trainable_variables),
+          zip(gradient, model.trainable_variables),
           global_step=global_step)
     return apply_grads
 
@@ -130,12 +131,14 @@ def main(_):
           "learning_rate": FLAGS.learning_rate
       }
   )
-
-  classifier.train(
-      input_fn=lambda params: input_fn(
-          mode=tf.estimator.ModeKeys.TRAIN,
-          **params),
-      max_steps=None, steps=None)
+  try:
+    classifier.train(
+        input_fn=lambda params: input_fn(
+            mode=tf.estimator.ModeKeys.TRAIN,
+            **params),
+        max_steps=FLAGS.max_steps)
+  except Exception:
+    pass
   # TODO(@captain-pool): Implement Evaluation
   if FLAGS.infer:
     def prepare_input_fn(path):
