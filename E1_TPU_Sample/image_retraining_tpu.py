@@ -10,7 +10,8 @@ from absl import flags, app
 
 flags.DEFINE_string("tpu", None, "TPU Address")
 flags.DEFINE_integer("iterations", 2, "Number of Itertions")
-flags.DEFINE_integer("batch_size", 10, "Size of eahc Batch")
+flags.DEFINE_integer("batch_size", 16, "Size of each Batch")
+flags.DEFINE_float("learning_rate", 1e-3, "Learning Rate")
 flags.DEFINE_boolean("use_tpu", True, " Use TPU")
 flags.DEFINE_boolean("use_compat", True, "Use OptimizerV1 from compat module")
 flags.DEFINE_string(
@@ -42,7 +43,6 @@ def input_(mode, batch_size, iterations, **kwargs):
     image = tf.image.resize(image, size=[224, 224])
     image = tf.cast(image, tf.float32)
     image = image / tf.reduce_max(tf.gather(image, 0))
-#        label = tf.one_hot(label, info.features['label'].num_classes)
     return image, label
 
   dataset = dataset.map(resize_and_scale).shuffle(
@@ -63,11 +63,11 @@ def model_fn(features, labels, mode, params):
   optimizer = None
   if mode == tf.estimator.ModeKeys.TRAIN:
     if not params["use_compat"]:
-      optimizer = tf.optimizers.Adam(params.get("learning_rate", 1e-3))
+      optimizer = tf.optimizers.Adam(params["learning_rate"])
     else:
       optimizer = tf.compat.v1.train.AdamOptimizer(
-          params.get("learning_rate", 1e-3))
-    if params.get("use_tpu", True):
+          params["learning_rate"])
+    if params.get["use_tpu"]:
       optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
 
   with tf.GradientTape() as tape:
@@ -126,7 +126,8 @@ def main(_):
           "use_tpu": FLAGS.use_tpu,
           "data_dir": FLAGS.data_dir,
           "dataset": FLAGS.dataset,
-          "use_compat": FLAGS.use_compat
+          "use_compat": FLAGS.use_compat,
+          "learning_rate": FLAGS.learning_rate
       }
   )
 
