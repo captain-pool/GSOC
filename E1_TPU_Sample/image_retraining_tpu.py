@@ -14,6 +14,7 @@ flags.DEFINE_integer("batch_size", 16, "Size of each Batch")
 flags.DEFINE_float("learning_rate", 1e-3, "Learning Rate")
 flags.DEFINE_boolean("use_tpu", True, " Use TPU")
 flags.DEFINE_boolean("use_compat", True, "Use OptimizerV1 from compat module")
+flags.DEFINE_integer("max_steps", 1000, "Maximum Number of Steps for TPU Estimator")
 flags.DEFINE_string(
     "model_dir",
     "model_dir/",
@@ -23,10 +24,17 @@ flags.DEFINE_string(
     "horses_or_humans",
     "TFDS Dataset Name. IMAGE Dimension should be >= 224, channel=3")
 flags.DEFINE_string("data_dir", None, "Directory to Save Data to")
+flags.DEFINE_string("infer", None, "Dummy image file to infer")
 
 FLAGS = flags.FLAGS
 NUM_CLASSES = None
 
+
+def resize_and_scale(image, label):
+  image = tf.image.resize(image, size=[224, 224])
+  image = tf.cast(image, tf.float32)
+  image = image / tf.reduce_max(tf.gather(image, 0))
+  return image, label
 
 def input_(mode, batch_size, iterations, **kwargs):
   global NUM_CLASSES
@@ -38,13 +46,6 @@ def input_(mode, batch_size, iterations, **kwargs):
       data_dir=kwargs['data_dir']
   )
   NUM_CLASSES = info.features['label'].num_classes
-
-  def resize_and_scale(image, label):
-    image = tf.image.resize(image, size=[224, 224])
-    image = tf.cast(image, tf.float32)
-    image = image / tf.reduce_max(tf.gather(image, 0))
-    return image, label
-
   dataset = dataset.map(resize_and_scale).shuffle(
       1000).repeat(iterations).batch(batch_size, drop_remainder=True)
   return dataset
@@ -67,7 +68,7 @@ def model_fn(features, labels, mode, params):
     else:
       optimizer = tf.compat.v1.train.AdamOptimizer(
           params["learning_rate"])
-    if params.get["use_tpu"]:
+    if params["use_tpu"]:
       optimizer = tpu_optimizer.CrossShardOptimizer(optimizer)
 
   with tf.GradientTape() as tape:
@@ -130,14 +131,23 @@ def main(_):
           "learning_rate": FLAGS.learning_rate
       }
   )
-
-  classifier.train(
-      input_fn=lambda params: input_fn(
-          mode=tf.estimator.ModeKeys.TRAIN,
-          **params),
-      max_steps=1000)
+  try:
+    classifier.train(
+        input_fn=lambda params: input_fn(
+            mode=tf.estimator.ModeKeys.TRAIN,
+            **params),
+        max_steps=FLAGS.max_steps)
+  except Exception:
+    pass
   # TODO(@captain-pool): Implement Evaluation
+  if FLAGS.infer:
+    def prepare_input_fn(path):
+      img = tf.image.decode_image(tf.io.read_file(path))
+      return resize_and_scale(img, None)
 
+    predictions = classifer.predict(
+        input_fn=lambda params: prepare_input_fn(FLAGS.infer))
+    print(predictions)
 
 if __name__ == "__main__":
   app.run(main)
