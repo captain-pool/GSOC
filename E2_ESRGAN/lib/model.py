@@ -1,24 +1,24 @@
 import tensorflow as tf
-from lib import *
+from lib.utils import *
 from functools import partial
 
 class RRDBNet(tf.keras.models.Model):
   def __init__(self, out_channel, num_features=64, trunk_size=3, growth_channel=32, use_bias=True):
     super(RRDBNet, self).__init__()
     self.RRDB_block = partial(RRDB, growth_channel)
-    conv = partial(tf.keras.layers.Conv2D,kernel=[3, 3],
+    conv = partial(tf.keras.layers.Conv2D,kernel_size=[3, 3],
                                              strides=[1, 1],
                                              use_bias=use_bias)
-   self.conv_first = conv(filters=num_features)
-   self.RDB_trunk = tf.keras.Sequential([self.RRDB_block() for _ in range(trunk_size)])
-   self.conv_trunk = conv(filters=num_features)   
-   # Upsample
-   self.upsample1 = conv(filters=num_features)
-   self.upsample2 = conv(filters=num_features)
-   self.conv_last_1 = conv(filters=num_features)
-   self.conv_last_2 = conv(filters=out_channel)
-
-   self.lrelu = tf.keras.layers.LeakyReLU()
+    self.conv_first = conv(filters=num_features)
+    self.RDB_trunk = tf.keras.Sequential([self.RRDB_block() for _ in range(trunk_size)])
+    self.conv_trunk = conv(filters=num_features)   
+    # Upsample
+    self.upsample1 = conv(filters=num_features)
+    self.upsample2 = conv(filters=num_features)
+    self.conv_last_1 = conv(filters=num_features)
+    self.conv_last_2 = conv(filters=out_channel)
+ 
+    self.lrelu = tf.keras.layers.LeakyReLU()
   def call(self, input_):
     feature = self.conv_first(input_)
     trunk = self.conv_trunk(self.RDB_trunk(feature))

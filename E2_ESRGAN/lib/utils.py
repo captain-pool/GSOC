@@ -1,5 +1,5 @@
 import tensorflow as tf
-from settings import settings
+from lib.settings import settings
 
 
 def PerceptualLoss(**kwargs):
@@ -53,12 +53,12 @@ def RelativisticAverageLoss(non_transformed_disc, type_="G"):
     return real_loss + fake_loss
 
   def loss_G(y_true, y_pred):
-   """
-    Relativistic Average Loss for Generator
-    Args:
-      y_true: Real Image
-      y_pred: Generated Image
-   """
+    """
+     Relativistic Average Loss for Generator
+     Args:
+       y_true: Real Image
+       y_pred: Generated Image
+    """
     real_logits = D_ra(y_true, y_pred)
     fake_logits = D_ra(y_pred, y_true)
     real_loss = tf.nn.sigmoid_cross_entropy_with_logits(
