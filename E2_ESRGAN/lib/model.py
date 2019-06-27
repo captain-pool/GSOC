@@ -8,6 +8,7 @@ class RRDBNet(tf.keras.models.Model):
     self.RRDB_block = partial(RRDB, growth_channel)
     conv = partial(tf.keras.layers.Conv2D,kernel_size=[3, 3],
                                              strides=[1, 1],
+                                             padding="same",
                                              use_bias=use_bias)
     self.conv_first = conv(filters=num_features)
     self.RDB_trunk = tf.keras.Sequential([self.RRDB_block() for _ in range(trunk_size)])

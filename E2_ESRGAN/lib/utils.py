@@ -80,7 +80,7 @@ class RDB(tf.keras.layers.Layer):
     self.conv = lambda x: tf.keras.layers.Conv2D(
         out_features,
         kernel_size=[3, 3],
-        strides=[1, 1], use_bias=bias)(x)
+        strides=[1, 1], padding="same", use_bias=bias)(x)
     self.lrelu = tf.keras.layers.LeakyReLU()
     self.beta = settings()["RDB"].get("residual_scale_beta", 0.2)
 
@@ -89,7 +89,7 @@ class RDB(tf.keras.layers.Layer):
     x2 = self.lrelu(self.conv(tf.concat([input_, x1], -1)))
     x3 = self.lrelu(self.conv(tf.concat([input_, x1, x2], -1)))
     x4 = self.lrelu(self.conv(tf.concat([input_, x1, x2, x3], -1)))
-    x5 = self.conv5(tf.concat([input_, x1, x2, x3, x4], -1))
+    x5 = self.conv(tf.concat([input_, x1, x2, x3, x4], -1))
     return input_ + self.beta * x5
 
 
