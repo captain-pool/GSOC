@@ -15,8 +15,10 @@ def PerceptualLoss(**kwargs):
       inputs=[vgg_model.input],
       outputs=[
           vgg_model.get_layer("block5_conv4")])
+
   def loss(y_true, y_pred):
-    return tf.compat.v1.absolute_difference(phi(y_true),phi(y_pred), reduction="weighted_mean")
+    return tf.compat.v1.absolute_difference(
+        phi(y_true), phi(y_pred), reduction="weighted_mean")
   return loss
 
 
@@ -35,7 +37,8 @@ def RelativisticAverageLoss(non_transformed_disc, type_="G"):
   loss = None
 
   def D_Ra(x, y):
-    return non_transformed_disc(x) - tf.reduce_mean(non_transformed_disc(y))
+    return non_transformed_disc(
+        x) - tf.reduce_mean(non_transformed_disc(y))
 
   def loss_D(y_true, y_pred):
     """
