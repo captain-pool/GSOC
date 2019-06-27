@@ -3,16 +3,20 @@ from settings import settings
 
 
 def PerceptualLoss(**kwargs):
-  vgg_model = tf.keras.applications.VGG19(**kwargs)
+  """ Perceptual Loss using VGG19
+      Args:
+        weights: Weights to be loaded.
+        input_shape: Shape of input image.
+  """
+  vgg_model = tf.keras.applications.VGG19(**kwargs, include_top=False)
   for layer in vgg_model.layers:
     layer.trainable = False
   phi = tf.keras.Model(
       inputs=[vgg_model.input],
       outputs=[
           vgg_model.get_layer("block5_conv4")])
-
   def loss(y_true, y_pred):
-    return tf.reduce_mean(tf.abs(phi(y_true) - phi(y_pred)))
+    return tf.compat.v1.absolute_difference(phi(y_true),phi(y_pred), reduction="weighted_mean")
   return loss
 
 
@@ -34,6 +38,12 @@ def RelativisticAverageLoss(non_transformed_disc, type_="G"):
     return non_transformed_disc(x) - tf.reduce_mean(non_transformed_disc(y))
 
   def loss_D(y_true, y_pred):
+    """
+      Relativistic Average Loss for Discriminator
+      Args:
+        y_true: Real Image
+        y_pred: Generated Image
+    """
     real_logits = D_ra(y_true, y_pred)
     fake_logits = D_ra(y_pred, y_true)
     real_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
@@ -43,6 +53,12 @@ def RelativisticAverageLoss(non_transformed_disc, type_="G"):
     return real_loss + fake_loss
 
   def loss_G(y_true, y_pred):
+   """
+    Relativistic Average Loss for Generator
+    Args:
+      y_true: Real Image
+      y_pred: Generated Image
+   """
     real_logits = D_ra(y_true, y_pred)
     fake_logits = D_ra(y_pred, y_true)
     real_loss = tf.nn.sigmoid_cross_entropy_with_logits(
@@ -57,7 +73,7 @@ def RelativisticAverageLoss(non_transformed_disc, type_="G"):
 
 
 class RDB(tf.keras.layers.Layer):
-  """ Residual Dense Block """
+  """ Residual Dense Block Layer"""
 
   def __init__(self, out_features=32, bias=True):
     super(RDB, self).__init__()
@@ -78,7 +94,7 @@ class RDB(tf.keras.layers.Layer):
 
 
 class RRDB(tf.keras.layers.Layer):
-  """ Residual in Residual Block """
+  """ Residual in Residual Block Layer"""
 
   def __init__(self, out_features=32):
     super(RRDB, self).__init__()
