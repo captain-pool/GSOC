@@ -50,7 +50,7 @@ class RRDBNet(tf.keras.Model):
 class VGGArch(tf.keras.Model):
   def __init__(self, output_shape=[1], num_features=64, use_bias=True):
 
-    super(Discriminator, self).__init__()
+    super(VGGArch, self).__init__()
     self.conv = lambda n, s, x: tf.keras.layers.Conv2D(
         n, kernel_size=[3, 3], strides=[s, s], use_bias=use_bias)(x)
     self.nf = num_features
