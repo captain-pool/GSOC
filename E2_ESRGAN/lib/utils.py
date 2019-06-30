@@ -1,7 +1,7 @@
 import tensorflow as tf
 from lib.settings import settings
 
-def checkpoint(checkpoint, load=False):
+def checkpoint(checkpoint, load=False, assert_consumed=True):
   """ Saves or Loads checkpoint.
       Args:
         checkpoint: tf.train.Checkpoint object
@@ -11,7 +11,9 @@ def checkpoint(checkpoint, load=False):
   if not load:
     checkpoint.save(file_prefix=dir_)
   else:
-    checkpoint.restore(tf.train.latest_checkpoint(dir_))
+    status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
+    if assert_consumed:
+      satus.assert_consumed()
 
 def PerceptualLoss(**kwargs):
   """ Perceptual Loss using VGG19

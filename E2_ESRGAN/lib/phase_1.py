@@ -31,14 +31,14 @@ class Model:
     self.summary_writer = kwargs["summary_writer"]
 
   def train(self):
-    # TODO (@captain-pool): Checkpoint Loader Goes here.
-    # (branch: add_checkpoint)
+    utils.checkpoint(self.checkpoint, load=True)
     metric = tf.keras.metrics.Mean()
     previous_loss = float("inf")
     decay_params = self.phase_args["adam"]["decay"]
     decay_step = decay_params["step"]
     decay_factor = decay_params["factor"]
     for epoch in range(self.iterations):
+      metric.reset_states()
       for idx, (lr, hr) in enumerate(self.dataset):
 
         if idx and idx % (decay_step - 1):  # Decay Learning Rate
@@ -62,7 +62,5 @@ class Model:
               "[WARMUP] Epoch: %d\tBatch: %d\tGenerator Loss: %f" %
               (epoch, idx + 1, mean_loss.numpy()))
           if mean_loss < previous_loss:
-            pass
-            # TODO (@captain-pool): Checkpoint Saver Goes Here.
-            # (branch: add_checkpoint)
+            utils.checkpoint(self.checkpoint)
           previous_loss = mean_loss
