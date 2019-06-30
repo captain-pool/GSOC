@@ -1,6 +1,17 @@
 import tensorflow as tf
 from lib.settings import settings
 
+def checkpoint(checkpoint, load=False):
+  """ Saves or Loads checkpoint.
+      Args:
+        checkpoint: tf.train.Checkpoint object
+        load: boolean to specify to load or store checkpoint
+  """
+  dir_ = settings().get("checkpoint_path", "ckpt")
+  if not load:
+    checkpoint.save(file_prefix=dir_)
+  else:
+    checkpoint.restore(tf.train.latest_checkpoint(dir_))
 
 def PerceptualLoss(**kwargs):
   """ Perceptual Loss using VGG19

@@ -1,3 +1,4 @@
+checkpoint_path: checkpoints/
 RDB:
   residual_scale_beta: 0.2
 adam:
