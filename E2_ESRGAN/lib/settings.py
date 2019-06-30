@@ -28,8 +28,11 @@ class settings:
 
 class stats:
   def __init__(self, filename="stats.yaml"):
-    with open(filename, "r") as f:
-      self.__data = yaml.load(f.read())
+    if os.path.exists(filename):
+      with open(filename, "r") as f:
+        self.__data = yaml.load(f.read())
+    else:
+      self.__data = {}
     self.file = filename
   def get(self, index, default=None):
     self.__data.get(index, default)
