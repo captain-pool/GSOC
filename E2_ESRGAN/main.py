@@ -22,10 +22,6 @@ if __name__ == '__main__':
   parser.add_argument("--config", "config.yaml", "Path to configuration file.")
   parser.add_argument("--data_dir", None, "Directory to put the Data.")
   parser.add_argument("--model_dir", None, "Directory to put the model in.")
-  parser.add_argument(
-      "--ckpt_dir",
-      "checkpoints/",
-      "Directory to put the checkpoints in.")
   parser.add_argument("--log_dir", None, "Directory to story Summaries.")
   parser.add_argument("-v", "--verbose", action="count", default=0)
   FLAGS, unparsed = parser.parse_known_args()
