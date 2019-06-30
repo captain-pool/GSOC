@@ -1,7 +1,30 @@
 checkpoint_path: "checkpoints/"
 RDB:
   residual_scale_beta: 0.2
-adam:
-  initial_lr: 0.0001
-  beta_1: 0.9
-  beta_2: 0.999
+dataset: 
+  name: "open_images_v4"
+  scale_method: "bicubic"
+  hr_dimension: 512
+#Training
+batch_size: 128
+iterations: 2
+lambda: 0.005
+eta: 0.01
+train_psnr:
+  adam:
+    initial_lr: 0.0002
+    decay:
+      factor: 2
+      step: 200000 
+    beta_1: 0.9
+    beta_2: 0.999
+train_combined:
+  adam:
+    initial_lr: 0.0001
+    decay:
+      factor: 2
+      step:
+        - 50000
+        - 100000
+        - 200000
+        - 300000

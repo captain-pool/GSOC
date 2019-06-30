@@ -6,7 +6,7 @@ class RRDBNet(tf.keras.Model):
   def __init__(
           self,
           out_channel,
-          num_features=64,
+          num_features=32,
           trunk_size=3,
           growth_channel=32,
           use_bias=True):
