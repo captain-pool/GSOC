@@ -84,7 +84,7 @@ class RDB(tf.keras.layers.Layer):
         out_features,
         kernel_size=[3, 3],
         strides=[1, 1], padding="same", use_bias=bias)(x)
-    self.lrelu = tf.keras.layers.LeakyReLU()
+    self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self.beta = settings()["RDB"].get("residual_scale_beta", 0.2)
 
   def call(self, input_):
