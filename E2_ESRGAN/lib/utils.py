@@ -1,19 +1,24 @@
 import tensorflow as tf
 from lib.settings import settings
 
-def checkpoint(checkpoint, load=False, assert_consumed=True):
+
+def checkpoint(checkpoint, training_phase, load=False, assert_consumed=True):
   """ Saves or Loads checkpoint.
       Args:
         checkpoint: tf.train.Checkpoint object
-        load: boolean to specify to load or store checkpoint
+        training_phase: The training phase of the model to load/store the checkpoint for.
+                        can be one of the two "phase_1" or "phase_2"
+        load: boolean to specify to load or store checkpoint.
+        assert_consumed: boolean to check whether or not all the restored variables are loaded.
   """
-  dir_ = settings().get("checkpoint_path", "ckpt")
+  dir_ = settings()["checkpoint_path"][training_phase]
   if not load:
     checkpoint.save(file_prefix=dir_)
   else:
     status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
     if assert_consumed:
       satus.assert_consumed()
+
 
 def PerceptualLoss(**kwargs):
   """ Perceptual Loss using VGG19

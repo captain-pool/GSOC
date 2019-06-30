@@ -31,7 +31,7 @@ class Model:
     self.summary_writer = kwargs["summary_writer"]
 
   def train(self):
-    utils.checkpoint(self.checkpoint, load=True)
+    utils.checkpoint(self.checkpoint, "phase_1", load=True)
     metric = tf.keras.metrics.Mean()
     previous_loss = float("inf")
     decay_params = self.phase_args["adam"]["decay"]
@@ -62,5 +62,5 @@ class Model:
               "[WARMUP] Epoch: %d\tBatch: %d\tGenerator Loss: %f" %
               (epoch, idx + 1, mean_loss.numpy()))
           if mean_loss < previous_loss:
-            utils.checkpoint(self.checkpoint)
+            utils.checkpoint(self.checkpoint, "phase_1")
           previous_loss = mean_loss

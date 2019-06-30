@@ -1,4 +1,6 @@
-checkpoint_path: "checkpoints/"
+checkpoint_path:
+  phase_1: "checkpoints/phase_1"
+  phase_2: "checkpoints/phase_2"
 RDB:
   residual_scale_beta: 0.2
 dataset: 
