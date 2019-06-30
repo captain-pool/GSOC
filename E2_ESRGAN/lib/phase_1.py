@@ -10,6 +10,7 @@ class Model:
         summary_writer: SummaryWriter object to write summaries for Tensorboard
   """
     settings = settings.settings()
+    self.warmup_num_iter = settings.get("warmup_num_iter", None)
     dataset_args = settings["dataset"]
     self.phase_args = settings["train_psnr"]
     self.dataset = dataset.load_dataset(
@@ -31,23 +32,24 @@ class Model:
     self.summary_writer = kwargs["summary_writer"]
 
   def train(self):
+    """ Train PSNR Model"""
+
     utils.checkpoint(self.checkpoint, "phase_1", load=True)
     metric = tf.keras.metrics.Mean()
     previous_loss = float("inf")
     decay_params = self.phase_args["adam"]["decay"]
     decay_step = decay_params["step"]
     decay_factor = decay_params["factor"]
+    num_steps = itertools.count(1)
     for epoch in range(self.iterations):
       metric.reset_states()
-      for idx, (lr, hr) in enumerate(self.dataset):
-
-        if idx and idx % (decay_step - 1):  # Decay Learning Rate
+      for lr, hr in self.dataset:
+        step = next(num_steps)
+        if step % (decay_step - 1):  # Decay Learning Rate
           self.G_optimizer.learning_rate.assign(
               self.G_optimizer.learning_rate * decay_factor)
-
-        # TODO (@captain-pool): Add Condition for Breaking Out of Warm up
-        # for a given step count
-
+        if self.warmup_num_iter and step % self.warmup_num_iter:
+          return
         with tf.GradientTape() as tape:
           fake = self.G(lr)
           loss = self.pixel_loss(hr, fake)
@@ -57,10 +59,10 @@ class Model:
         mean_loss = metric(loss)
         with self.summary_writer.as_default():
           tf.summary.scalar("warmup_loss", mean_loss)
-        if not idx % 100:
+        if not step % 100:
           logging.info(
               "[WARMUP] Epoch: %d\tBatch: %d\tGenerator Loss: %f" %
-              (epoch, idx + 1, mean_loss.numpy()))
+              (epoch, step, mean_loss.numpy()))
           if mean_loss < previous_loss:
             utils.checkpoint(self.checkpoint, "phase_1")
           previous_loss = mean_loss
