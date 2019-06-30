@@ -53,19 +53,19 @@ class VGGArch(tf.keras.Model):
     super(VGGArch, self).__init__()
     self.conv = lambda n, s, x: tf.keras.layers.Conv2D(
         n, kernel_size=[3, 3], strides=[s, s], use_bias=use_bias)(x)
-    self.nf = num_features
+    self.num_features = num_features
     self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self.bn = lambda x: tf.keras.layers.BatchNormalization()(x)
     self.dense = tf.keras.layers.Dense
 
   def call(self, input_):
 
-    features = self.lrelu(self.conv(self.nf, 1, input_))
-    features = self.lrelu(self.bn(self.conv(self.nf, 2, features)))
+    features = self.lrelu(self.conv(self.num_features, 1, input_))
+    features = self.lrelu(self.bn(self.conv(self.num_features, 2, features)))
     # VGG Trunk
     for i in range(1, 4):
       for j in range(1, 3):
-        features = self.lrelu(self.bn(self.conv(2**i * self.nf, j, features)))
+        features = self.lrelu(self.bn(self.conv(2**i * self.num_features, j, features)))
 
     flattened = tf.keras.layers.Flatten()(features)
     dense = self.lrelu(self.dense(1024)(flattened))

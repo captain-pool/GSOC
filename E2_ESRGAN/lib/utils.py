@@ -23,7 +23,7 @@ def PerceptualLoss(**kwargs):
 
 
 def pixel_loss(y_true, y_pred):
-  return tf.reduce_mean(tf_abs(y_true - y_pred))
+  return tf.reduce_mean(tf.abs(y_true - y_pred))
 
 
 def RelativisticAverageLoss(non_transformed_disc, type_="G"):
