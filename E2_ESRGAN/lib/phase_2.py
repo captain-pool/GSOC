@@ -1,3 +1,4 @@
+import time
 import logging
 import itertools
 from functools import partial
@@ -63,11 +64,10 @@ class Model:
       # Resetting Metrics
       gen_metric.reset_states()
       disc_metric.reset_states()
-
+      start = time.time()
       for (image_lr, image_hr) in self._dataset:
         
         step = next(num_steps)
-        
         # Decaying Learning Rate
         for _step in decay_steps.copy():
           if step >= _step:
@@ -102,7 +102,9 @@ class Model:
           tf.summary.image("hr_image", fake)
         # Logging and Checkpointing
         if not step % 100:
-          logging.info("Epoch: %d\tBatch: %d\tGen Loss: %f\tDisc Loss: %f" % (
+          logging.info("Epoch: %d\tBatch: %d\tGen Loss: %f\tDisc Loss: %f\t Time Taken: %f sec" % (
               (epoch + 1), steps // (epoch + 1),
-              gen_metric.result().numpy(), disc_metric.result().numpy()))
+              gen_metric.result().numpy(), 
+              disc_metric.result().numpy(), time.time() - start))
           utils.save_checkpoint(self._checkpoint, "train_combined")
+          start = time.time()
