@@ -1,6 +1,6 @@
 import logging
-from functools import partial
 import itertools
+from functools import partial
 import tensorflow as tf
 from lib import settings, model, utils, dataset
 
@@ -14,23 +14,23 @@ class Model:
     """
     sett = settings.settings()
     dataset_args = sett["dataset"]
-    self.phase_args = sett["train_combined"]
-    self.dataset = dataset.load_dataset(
+    self._phase_args = sett["train_combined"]
+    self._dataset = dataset.load_dataset(
         dataset_args["name"],
         dataset.scale_down(
             method=dataset_args["scale_method"],
             dimension=dataset_args["dimension"]),
         batch_size=sett["batch_size"],
         data_dir=kwargs["data_dir"])
-    self.iterations = sett["iterations"]
+    self._iterations = sett["iterations"]
     self.G = model.RRDBNet(out_channel=3)
     self.D = model.VGGArch()
 
     optimizer = partial(
         tf.optimizers.Adam,
-        learning_rate=self.phase_args["adam"]["initial_lr"],
-        beta_0=self.phase_args["adam"]["beta_0"],
-        beta_1=self.phase_args["adam"]["beta_1"])
+        learning_rate=self._phase_args["adam"]["initial_lr"],
+        beta_0=self._phase_args["adam"]["beta_0"],
+        beta_1=self._phase_args["adam"]["beta_1"])
     self.G_optimizer = optimizer()
     self.D_optimizer = optimizer()
     self.perceptual_loss = utils.PerceptualLoss(
@@ -39,8 +39,8 @@ class Model:
     self.Ra_G = utils.RelativisticAverageLoss(self.D, type_="G")
     self.Ra_D = utils.RelativisticAverageLoss(self.D, type_="D")
     hot_start = tf.train.Checkpoint(G=self.G, G_optimizer=self.G_optimizer)
-    utils.checkpoint(hot_start, "train_psnr", load=True)
-    self.checkpoint = tf.train.Checkpoint(
+    utils.load_checkpoint(hot_start, "train_psnr")
+    self._checkpoint = tf.train.Checkpoint(
         G=self.G,
         G_optimizer=self.G_optimizer,
         D=self.D,
@@ -49,22 +49,22 @@ class Model:
 
   def train(self):
     """ Train the ESRGAN Model """
-    utils.checkpoint(self.checkpoint, "train_combined", load=True)
+    utils.load_checkpoint(self._checkpoint, "train_combined")
     gen_metric = tf.keras.metrics.Mean()
     disc_metric = tf.keras.metrics.Mean()
     num_steps = itertools.count(1)
-    decay_args = self.phase_args["adam"]["decay"]
+    decay_args = self._phase_args["adam"]["decay"]
     decay_factor = decay_args["factor"]
     decay_steps = decay_args["step"]
-    lambda_ = self.phase_args["lambda"]
-    eta = self.phase_args["eta"]
+    lambda_ = self._phase_args["lambda"]
+    eta = self._phase_args["eta"]
     
-    for epoch in range(self.iterations):
+    for epoch in range(self._iterations):
       # Resetting Metrics
       gen_metric.reset_states()
       disc_metric.reset_states()
 
-      for (image_lr, image_hr) in self.dataset:
+      for (image_lr, image_hr) in self._dataset:
         
         step = next(num_steps)
         
@@ -105,4 +105,4 @@ class Model:
           logging.info("Epoch: %d\tBatch: %d\tGen Loss: %f\tDisc Loss: %f" % (
               (epoch + 1), steps // (epoch + 1),
               gen_metric.result().numpy(), disc_metric.result().numpy()))
-          utils.checkpoint(self.checkpoint, "train_combined")
+          utils.save_checkpoint(self._checkpoint, "train_combined")
