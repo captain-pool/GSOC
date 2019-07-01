@@ -1,7 +1,7 @@
 import os
 import argparse
 import logging
-from lib import settings, phase_1
+from lib import settings, phase_1, model
 import tensorflow as tf
 
 
@@ -9,11 +9,15 @@ def main(**kwargs):
   sett = settings.settings(kwargs["config"])
   stats = settings.stats(os.path.join(sett.path, "stats.yaml"))
   summary_writer = tf.summary.create_file_writer(kwargs["logdir"])
-  psnr_model = phase_1.Model(
-      data_dir=kwargs["data_dir"],
-      summary_writer=summary_writer)
+  G = model.RDBNet(out_channel=3)
+  D = model.VGGArch()
+ 
   if not stats["train_step_1"]:
-    psnr_model.train()
+   phase_1.warmup_generator(
+      generator=G, 
+      data_dir=kwargs["data_dir"],
+      summary_writer=summary_writer,
+      settings=sett)
     stats["train_step_1"] = True
 
 
