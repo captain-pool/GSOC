@@ -1,12 +1,17 @@
 checkpoint_path:
   phase_1: "checkpoints/phase_1"
   phase_2: "checkpoints/phase_2"
-RDB:
-  residual_scale_beta: 0.2
+
 dataset: 
   name: "open_images_v4"
   scale_method: "bicubic"
   hr_dimension: 512
+
+# The following configuration is taken from ESRGAN Paper
+# Paper Available at: https://arxiv.org/abs/1809.00219
+
+RDB:
+  residual_scale_beta: 0.2
 #Training
 # warmup_num_iter: 1000 # Number of steps to train the PSNR model
 batch_size: 128

@@ -12,7 +12,7 @@ def singleton(cls):
 
 
 @singleton
-class settings:
+class settings(object):
   def __init__(self, filename="config.yaml"):
     with open(filename, "r") as f:
       self.__data = yaml.load(f.read())
@@ -26,7 +26,7 @@ class settings:
   def get(self, index, default=None):
     return self.__data.get(index, default)
 
-class stats:
+class stats(object):
   def __init__(self, filename="stats.yaml"):
     if os.path.exists(filename):
       with open(filename, "r") as f:
