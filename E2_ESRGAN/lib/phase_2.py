@@ -6,15 +6,15 @@ import tensorflow as tf
 from lib import settings, utils, dataset
 
 
-def train_gan(G, D, summary_writer, data_dir=None):
+def train_gan(G, D, summary_writer, sett, data_dir=None):
   """ Implements ESRGAN
       Args:
         G: Generator model.
         D: Discriminator model with non transformed output.
         summary_writer: tf.summary.SummaryWriter to write summaries for Tensorboard.
+        sett: settings object
         data_dir: Path to download the dataset from tfds.
   """
-  sett = settings.settings()
   dataset_args = sett["dataset"]
   phase_args = sett["train_combined"]
   decay_args = phase_args["adam"]["decay"]
