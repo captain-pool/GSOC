@@ -1,17 +1,17 @@
 from functools import partial
 import tensorflow as tf
-from lib.utils import *
+from lib import utils
 
 class RRDBNet(tf.keras.Model):
   def __init__(
           self,
           out_channel,
-          num_features=64,
+          num_features=32,
           trunk_size=3,
           growth_channel=32,
           use_bias=True):
     super(RRDBNet, self).__init__()
-    self.RRDB_block = partial(RRDB, growth_channel)
+    self.RRDB_block = partial(utils.RRDB, growth_channel)
     conv = partial(tf.keras.layers.Conv2D, kernel_size=[3, 3],
                    strides=[1, 1],
                    padding="same",

@@ -1,17 +1,31 @@
 import tensorflow as tf
 from lib.settings import settings
 
-def checkpoint(checkpoint, load=False):
-  """ Saves or Loads checkpoint.
+
+def save_checkpoint(checkpoint, training_phase):
+  """ Saves checkpoint.
       Args:
         checkpoint: tf.train.Checkpoint object
-        load: boolean to specify to load or store checkpoint
+        training_phase: The training phase of the model to load/store the checkpoint for.
+                        can be one of the two "phase_1" or "phase_2"
   """
-  dir_ = settings().get("checkpoint_path", "ckpt")
-  if not load:
-    checkpoint.save(file_prefix=dir_)
-  else:
-    checkpoint.restore(tf.train.latest_checkpoint(dir_))
+  dir_ = settings()["checkpoint_path"][training_phase]
+  checkpoint.save(file_prefix=dir_)
+  
+
+def load_checkpoint(checkpoint, training_phase, assert_consumed=True)
+   """ Saves checkpoint.
+      Args:
+        checkpoint: tf.train.Checkpoint object
+        training_phase: The training phase of the model to load/store the checkpoint for.
+                        can be one of the two "phase_1" or "phase_2"
+        assert_consumed: assert all the restored variables are consumed in the model
+  """
+  dir_ = settings()["checkpoint_path"][training_phase]
+  status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
+  if assert_consumed:
+    status.assert_consumed()
+
 
 def PerceptualLoss(**kwargs):
   """ Perceptual Loss using VGG19
@@ -25,10 +39,10 @@ def PerceptualLoss(**kwargs):
   phi = tf.keras.Model(
       inputs=[vgg_model.input],
       outputs=[
-          vgg_model.get_layer("block5_conv4")])
+          vgg_model.get_layer("block5_conv4").output])
 
   def loss(y_true, y_pred):
-    return tf.compat.v1.absolute_difference(
+    return tf.compat.v1.losses.absolute_difference(
         phi(y_true), phi(y_pred), reduction="weighted_mean")
   return loss
 
@@ -58,8 +72,8 @@ def RelativisticAverageLoss(non_transformed_disc, type_="G"):
         y_true: Real Image
         y_pred: Generated Image
     """
-    real_logits = D_ra(y_true, y_pred)
-    fake_logits = D_ra(y_pred, y_true)
+    real_logits = D_Ra(y_true, y_pred)
+    fake_logits = D_Ra(y_pred, y_true)
     real_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
         labels=tf.ones_like(real_logits), logits=real_logits))
     fake_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
@@ -73,12 +87,13 @@ def RelativisticAverageLoss(non_transformed_disc, type_="G"):
        y_true: Real Image
        y_pred: Generated Image
     """
-    real_logits = D_ra(y_true, y_pred)
-    fake_logits = D_ra(y_pred, y_true)
+    real_logits = D_Ra(y_true, y_pred)
+    fake_logits = D_Ra(y_pred, y_true)
     real_loss = tf.nn.sigmoid_cross_entropy_with_logits(
         labels=tf.zeros_like(real_logits), logits=real_logits)
     fake_loss = tf.nn.sigmoid_cross_entropy_with_logits(
         labels=tf.ones_like(fake_logits), logits=fake_logits)
+    return real_loss + fake_loss
   if type_ == "G":
     loss = loss_G
   elif type_ == "D":
