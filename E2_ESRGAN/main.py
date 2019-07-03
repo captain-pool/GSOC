@@ -12,17 +12,15 @@ def main(**kwargs):
   Generator = model.RDBNet(out_channel=3)
   Discriminator = model.VGGArch()
   training = train.Training.setup_training(
-      Generator,
-      Discriminator,
-      summary_writer,
-      sett,
+      summary_writer=summary_writer,
+      settings=sett,
       data_dir=kwargs["data_dir"])
-  
+
   if not stats["train_step_1"]:
-    training.Training.warmup_generator()
+    training.Training.warmup_generator(Generator)
     stats["train_step_1"] = True
   if not stats["train_step_2"]:
-    train.train_gan()
+    train.train_gan(Generator, Discriminator)
     stats["train_step_2"] = True
 
   # TODO (@captain-pool): Implement Generator saver for SavedModel2.0

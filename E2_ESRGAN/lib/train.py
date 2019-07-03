@@ -8,19 +8,14 @@ from lib import utils, model, dataset
 
 class Training(object):
   @classmethod
-  def setup_training(cls, generator, discriminator,
-                     summary_writer, settings, data_dir=None):
+  def setup_training(cls, summary_writer, settings, data_dir=None):
     """ Setup the values and variables for Training.
         Args:
-          generator: Model class for the generator
-          discriminiator: Model class for discriminator
           summary_writer: tf.summary.SummaryWriter object to write summaries for Tensorboard
           settings: settings object for fetching data from config files
           data_dir (default: None): path where the data downloaded should be stored / accessed
     """
     cls.settings = settings
-    cls.generator = generator
-    cls.discriminator = discriminator
     cls.summary_writer = summary_writer
     cls.iterations = cls.settings["iterations"]
     dataset_args = cls.settings["dataset"]
@@ -33,13 +28,15 @@ class Training(object):
         data_dir=data_dir)
 
   @classmethod
-  def warmup_generator(cls):
+  def warmup_generator(cls, generator):
     """ Training on L1 Loss to warmup the Generator.
 
     Minimizing the L1 Loss will reduce the Peak Signal to Noise Ratio (PSNR)
     of the generated image from the generator.
     This trained generator is then used to bootstrap the training of the
     GAN, creating better image inputs instead of random noises.
+    Args:
+      generator: Model Object for the Generator
     """
     # Loading up phase parameters
     warmup_num_iter = cls.settings.get("warmup_num_iter", None)
@@ -58,7 +55,7 @@ class Training(object):
         beta_1=phase_args["adam"]["beta_1"])
 
     checkpoint = tf.train.Checkpoint(
-        G=cls.generator,
+        G=generator,
         G_optimizer=G_optimizer)
 
     utils.load_checkpoint(checkpoint, "phase_1")
@@ -78,11 +75,11 @@ class Training(object):
           return
 
         with tf.GradientTape() as tape:
-          fake = cls.generator(lr)
+          fake = generator(lr)
           loss = pixel_loss(hr, fake)
-        gradient = tape.gradient(fake, cls.generator.trainable_variables)
+        gradient = tape.gradient(fake, generator.trainable_variables)
         G_optimizer.apply_gradients(
-            *zip(gradient, cls.generator.trainable_variables))
+            *zip(gradient, generator.trainable_variables))
         mean_loss = metric(loss)
 
         with cls.summary_writer.as_default():
@@ -99,8 +96,12 @@ class Training(object):
           start_time = time.time()
 
   @classmethod
-  def train_gan(cls):
-    """ Implements Training routine for ESRGAN """
+  def train_gan(cls, generator, discriminator):
+    """ Implements Training routine for ESRGAN
+        Args:
+          generator: Model object for the Generator
+          discriminator: Model object for the Discriminator
+    """
     phase_args = cls.settings["train_combined"]
     decay_args = phase_args["adam"]["decay"]
     decay_factor = decay_args["factor"]
@@ -123,16 +124,16 @@ class Training(object):
         input_shape=[
             cls.settings["dataset"]["hr_dimension"],
             cls.settings["dataset"]["hr_dimension"]])
-    Ra_G = utils.RelativisticAverageLoss(cls.discriminator, type_="G")
-    Ra_D = utils.RelativisticAverageLoss(cls.discriminator, type_="D")
+    Ra_G = utils.RelativisticAverageLoss(discriminator, type_="G")
+    Ra_D = utils.RelativisticAverageLoss(discriminator, type_="D")
 
-    hot_start = tf.train.Checkpoint(G=cls.generator, G_optimizer=G_optimizer)
+    hot_start = tf.train.Checkpoint(G=generator, G_optimizer=G_optimizer)
     utils.load_checkpoint(hot_start, "train_psnr")
 
     checkpoint = tf.train.Checkpoint(
-        G=cls.generator,
+        G=generator,
         G_optimizer=G_optimizer,
-        D=cls.discriminator,
+        D=discriminator,
         D_optimizer=D_optimizer)
 
     utils.load_checkpoint(checkpoint, "train_combined")
@@ -159,7 +160,7 @@ class Training(object):
 
        # Calculating Loss applying gradients
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-          fake = cls.generator(image_lr)
+          fake = generator(image_lr)
           L_percep = perceptual_loss(image_hr, fake)
           L1 = utils.pixel_loss(image_hr, fake)
           L_RaG = Ra_G(image_hr, fake)
@@ -168,13 +169,13 @@ class Training(object):
           disc_metric(disc_loss)
           gen_metric(gen_loss)
         disc_grad = disc_tape.gradient(
-            disc_loss, cls.discriminator.trainable_variables)
+            disc_loss, discriminator.trainable_variables)
         gen_grad = gen_tape.gradient(
-            gen_loss, cls.generator.trainable_variables)
+            gen_loss, generator.trainable_variables)
         D_optimizer.apply_gradients(
-            *zip(disc_grad, cls.discriminator.trainable_variables))
+            *zip(disc_grad, discriminator.trainable_variables))
         G_optimizer.apply_gradients(
-            *zip(gen_grad, cls.generator.trainable_variables))
+            *zip(gen_grad, generator.trainable_variables))
 
         # Writing Summary
         with cls.summary_writer.as_default():
