@@ -1,8 +1,10 @@
 import os
 import argparse
 import logging
-from lib import settings, phase_1, model
+from lib import settings, phase_1, phase_2, model
 import tensorflow as tf
+
+# TODO (@captain-pool): Merge phase_1 and phase_2 in one file.
 
 
 def main(**kwargs):
@@ -11,14 +13,23 @@ def main(**kwargs):
   summary_writer = tf.summary.create_file_writer(kwargs["logdir"])
   G = model.RDBNet(out_channel=3)
   D = model.VGGArch()
- 
+
   if not stats["train_step_1"]:
-   phase_1.warmup_generator(
-      generator=G, 
-      data_dir=kwargs["data_dir"],
-      summary_writer=summary_writer,
-      settings=sett)
+    phase_1.warmup_generator(
+        generator=G,
+        data_dir=kwargs["data_dir"],
+        summary_writer=summary_writer,
+        settings=sett)
     stats["train_step_1"] = True
+  if not stats["train_step_2"]:
+    phase_2.train_gan(
+        G=G, D=D,
+        summary_writer=summary_writer,
+        sett=sett,
+        data_dir=kwargs["data_dir"])
+    stats["train_step_2"] = True
+
+  # TODO (@captain-pool): Implement Generator saver for SavedModel2.0
 
 
 if __name__ == '__main__':

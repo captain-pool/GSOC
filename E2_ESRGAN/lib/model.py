@@ -2,6 +2,7 @@ from functools import partial
 import tensorflow as tf
 from lib import utils
 
+
 class RRDBNet(tf.keras.Model):
   def __init__(
           self,
@@ -65,7 +66,13 @@ class VGGArch(tf.keras.Model):
     # VGG Trunk
     for i in range(1, 4):
       for j in range(1, 3):
-        features = self.lrelu(self.bn(self.conv(2**i * self.num_features, j, features)))
+        features = self.lrelu(
+            self.bn(
+                self.conv(
+                    2**i *
+                    self.num_features,
+                    j,
+                    features)))
 
     flattened = tf.keras.layers.Flatten()(features)
     dense = self.lrelu(self.dense(1024)(flattened))
