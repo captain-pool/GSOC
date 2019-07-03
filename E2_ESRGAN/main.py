@@ -17,7 +17,7 @@ def main(**kwargs):
       data_dir=kwargs["data_dir"])
 
   if not stats["train_step_1"]:
-    training.Training.warmup_generator(Generator)
+    train.Training.warmup_generator(Generator)
     stats["train_step_1"] = True
   if not stats["train_step_2"]:
     train.train_gan(Generator, Discriminator)
