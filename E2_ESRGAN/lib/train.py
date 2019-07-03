@@ -84,6 +84,7 @@ def warmup_generator(generator, summary_writer, settings, data_dir=None):
         previous_loss = mean_loss
         start_time = time.time()
 
+
 def train_gan(G, D, summary_writer, settings, data_dir=None):
   """ Implements ESRGAN
       Args:
