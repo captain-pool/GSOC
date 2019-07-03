@@ -32,7 +32,7 @@ def main(**kwargs):
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
-  parser.add_argument("--config", "config.yaml", "Path to configuration file.")
+  parser.add_argument("--config", "config/config.yaml", "Path to configuration file.")
   parser.add_argument("--data_dir", None, "Directory to put the Data.")
   parser.add_argument("--model_dir", None, "Directory to put the model in.")
   parser.add_argument("--log_dir", None, "Directory to story Summaries.")
