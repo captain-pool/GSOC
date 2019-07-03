@@ -20,7 +20,7 @@ def main(**kwargs):
     train.Training.warmup_generator(Generator)
     stats["train_step_1"] = True
   if not stats["train_step_2"]:
-    train.train_gan(Generator, Discriminator)
+    train.Training.train_gan(Generator, Discriminator)
     stats["train_step_2"] = True
 
   # TODO (@captain-pool): Implement Generator saver for SavedModel2.0
