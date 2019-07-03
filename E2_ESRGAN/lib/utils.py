@@ -11,7 +11,7 @@ def save_checkpoint(checkpoint, training_phase):
   """
   dir_ = settings()["checkpoint_path"][training_phase]
   checkpoint.save(file_prefix=dir_)
-  
+
 
 def load_checkpoint(checkpoint, training_phase, assert_consumed=True)
    """ Saves checkpoint.

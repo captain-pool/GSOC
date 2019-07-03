@@ -5,6 +5,8 @@ from functools import partial
 import tensorflow as tf
 from lib import settings, utils, dataset
 
+# TODO (@captain-pool): Merge phase_1 and phase_2 in one file.
+
 
 def train_gan(G, D, summary_writer, sett, data_dir=None):
   """ Implements ESRGAN
