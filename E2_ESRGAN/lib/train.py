@@ -7,19 +7,19 @@ from lib import utils, model, dataset
 
 
 class Training(object):
-  @classmethod
-  def setup_training(cls, summary_writer, settings, data_dir=None):
+  """ Trainer class for ESRGAN """
+  def __init__(self, summary_writer, settings, data_dir=None):
     """ Setup the values and variables for Training.
         Args:
           summary_writer: tf.summary.SummaryWriter object to write summaries for Tensorboard
           settings: settings object for fetching data from config files
           data_dir (default: None): path where the data downloaded should be stored / accessed
     """
-    cls.settings = settings
-    cls.summary_writer = summary_writer
-    cls.iterations = cls.settings["iterations"]
-    dataset_args = cls.settings["dataset"]
-    cls.dataset = dataset.load_dataset(
+    self.settings = settings
+    self.summary_writer = summary_writer
+    self.iterations = self.settings["iterations"]
+    dataset_args = self.settings["dataset"]
+    self.dataset = dataset.load_dataset(
         dataset_args["name"],
         dataset.scale_down(
             method=dataset_args["scale_method"],
@@ -27,8 +27,7 @@ class Training(object):
         batch_size=settings["batch_size"],
         data_dir=data_dir)
 
-  @classmethod
-  def warmup_generator(cls, generator):
+  def warmup_generator(self, generator):
     """ Training on L1 Loss to warmup the Generator.
 
     Minimizing the L1 Loss will reduce the Peak Signal to Noise Ratio (PSNR)
@@ -39,8 +38,8 @@ class Training(object):
       generator: Model Object for the Generator
     """
     # Loading up phase parameters
-    warmup_num_iter = cls.settings.get("warmup_num_iter", None)
-    phase_args = cls.settings["train_psnr"]
+    warmup_num_iter = self.settings.get("warmup_num_iter", None)
+    phase_args = self.settings["train_psnr"]
     decay_params = phase_args["adam"]["decay"]
     decay_step = decay_params["step"]
     decay_factor = decay_params["factor"]
@@ -62,9 +61,9 @@ class Training(object):
     previous_loss = float("inf")
     start_time = time.time()
     # Training starts
-    for epoch in range(cls.iterations):
+    for epoch in range(self.iterations):
       metric.reset_states()
-      for lr, hr in cls.dataset:
+      for lr, hr in self.dataset:
         step = next(num_steps)
 
         if step % (decay_step - 1):  # Decay Learning Rate
@@ -82,7 +81,7 @@ class Training(object):
             *zip(gradient, generator.trainable_variables))
         mean_loss = metric(loss)
 
-        with cls.summary_writer.as_default():
+        with self.summary_writer.as_default():
           tf.summary.scalar("warmup_loss", mean_loss)
 
         if not step % 100:
@@ -95,14 +94,13 @@ class Training(object):
           previous_loss = mean_loss
           start_time = time.time()
 
-  @classmethod
-  def train_gan(cls, generator, discriminator):
+  def train_gan(self, generator, discriminator):
     """ Implements Training routine for ESRGAN
         Args:
           generator: Model object for the Generator
           discriminator: Model object for the Discriminator
     """
-    phase_args = cls.settings["train_combined"]
+    phase_args = self.settings["train_combined"]
     decay_args = phase_args["adam"]["decay"]
     decay_factor = decay_args["factor"]
     decay_steps = decay_args["step"]
@@ -122,12 +120,16 @@ class Training(object):
     perceptual_loss = utils.PerceptualLoss(
         weights="imagenet",
         input_shape=[
-            cls.settings["dataset"]["hr_dimension"],
-            cls.settings["dataset"]["hr_dimension"]])
+            self.settings["dataset"]["hr_dimension"],
+            self.settings["dataset"]["hr_dimension"]])
     Ra_G = utils.RelativisticAverageLoss(discriminator, type_="G")
     Ra_D = utils.RelativisticAverageLoss(discriminator, type_="D")
-
+    
+    # The weights of generator trained during Phase #1
+    # is used to initialize or "hot start" the generator
+    # for phase #2 of training
     hot_start = tf.train.Checkpoint(G=generator, G_optimizer=G_optimizer)
+    
     utils.load_checkpoint(hot_start, "train_psnr")
 
     checkpoint = tf.train.Checkpoint(
@@ -141,12 +143,12 @@ class Training(object):
     gen_metric = tf.keras.metrics.Mean()
     disc_metric = tf.keras.metrics.Mean()
 
-    for epoch in range(cls.iterations):
+    for epoch in range(self.iterations):
       # Resetting Metrics
       gen_metric.reset_states()
       disc_metric.reset_states()
       start = time.time()
-      for (image_lr, image_hr) in cls.dataset:
+      for (image_lr, image_hr) in self.dataset:
 
         step = next(num_steps)
         # Decaying Learning Rate
@@ -178,7 +180,7 @@ class Training(object):
             *zip(gen_grad, generator.trainable_variables))
 
         # Writing Summary
-        with cls.summary_writer.as_default():
+        with self.summary_writer.as_default():
           tf.summary.scalar("gen_loss", gen_metric)
           tf.summary.scalar("disc_loss", disc_metric)
           tf.summary.image("lr_image", image_lr)

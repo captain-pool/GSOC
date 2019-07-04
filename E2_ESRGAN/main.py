@@ -11,16 +11,16 @@ def main(**kwargs):
   summary_writer = tf.summary.create_file_writer(kwargs["logdir"])
   Generator = model.RDBNet(out_channel=3)
   Discriminator = model.VGGArch()
-  training = train.Training.setup_training(
+  training = train.Training(
       summary_writer=summary_writer,
       settings=sett,
       data_dir=kwargs["data_dir"])
 
   if not stats["train_step_1"]:
-    train.Training.warmup_generator(Generator)
+    training.warmup_generator(Generator)
     stats["train_step_1"] = True
   if not stats["train_step_2"]:
-    train.Training.train_gan(Generator, Discriminator)
+    training.train_gan(Generator, Discriminator)
     stats["train_step_2"] = True
 
   # TODO (@captain-pool): Implement Generator saver for SavedModel2.0
