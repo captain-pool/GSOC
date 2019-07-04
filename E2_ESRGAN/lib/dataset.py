@@ -1,7 +1,6 @@
 import io
 import tensorflow as tf
 import tensorflow_datasets as tfds
-from lib.settings import settings
 
 
 def scale_down(method="bicubic", dimension=1024, factor=4):
@@ -28,9 +27,9 @@ def load_dataset(
                        data_dir=data_dir,
                        split=split,
                        as_supervised=True)
-             .shuffle(buffer_size,
-                      reshuffle_each_iterations=True)
              .batch(batch_size)
              .repeat(iterations)
              .map(low_res_map_fn))
+  if shuffle:
+    dataset = dataset.shuffle(buffer_size, reshuffle_each_iterations=True)
   return dataset

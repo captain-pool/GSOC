@@ -13,8 +13,8 @@ def save_checkpoint(checkpoint, training_phase):
   checkpoint.save(file_prefix=dir_)
 
 
-def load_checkpoint(checkpoint, training_phase, assert_consumed=True)
-   """ Saves checkpoint.
+def load_checkpoint(checkpoint, training_phase, assert_consumed=True):
+  """ Saves checkpoint.
       Args:
         checkpoint: tf.train.Checkpoint object
         training_phase: The training phase of the model to load/store the checkpoint for.
