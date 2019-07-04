@@ -3,10 +3,9 @@ import logging
 import itertools
 from functools import partial
 import tensorflow as tf
-from lib import utils, model, dataset
+from lib import utils, dataset
 
-
-class Training(object):
+class Trainer(object):
   """ Trainer class for ESRGAN """
   def __init__(self, summary_writer, settings, data_dir=None):
     """ Setup the values and variables for Training.
@@ -63,7 +62,7 @@ class Training(object):
     # Training starts
     for epoch in range(self.iterations):
       metric.reset_states()
-      for lr, hr in self.dataset:
+      for image_lr, image_hr in self.dataset:
         step = next(num_steps)
 
         if step % (decay_step - 1):  # Decay Learning Rate
@@ -74,8 +73,8 @@ class Training(object):
           return
 
         with tf.GradientTape() as tape:
-          fake = generator(lr)
-          loss = pixel_loss(hr, fake)
+          fake = generator(image_lr)
+          loss = utils.pixel_loss(image_hr, fake)
         gradient = tape.gradient(fake, generator.trainable_variables)
         G_optimizer.apply_gradients(
             *zip(gradient, generator.trainable_variables))
@@ -86,7 +85,7 @@ class Training(object):
 
         if not step % 100:
           logging.info(
-              "[WARMUP] Epoch: {}\tBatch: {}\tGenerator Loss: {}\tTime Taken: {}".format(
+              "[WARMUP] Epoch: {}\tBatch: {}\tGenerator Loss: {}\tTime Taken: {} sec".format(
                   epoch, step // (epoch + 1),
                   mean_loss.numpy(), time.time() - start_time))
           if mean_loss < previous_loss:
@@ -122,14 +121,13 @@ class Training(object):
         input_shape=[
             self.settings["dataset"]["hr_dimension"],
             self.settings["dataset"]["hr_dimension"]])
-    Ra_G = utils.RelativisticAverageLoss(discriminator, type_="G")
-    Ra_D = utils.RelativisticAverageLoss(discriminator, type_="D")
+    ra_gen = utils.RelativisticAverageLoss(discriminator, type_="G")
+    ra_disc = utils.RelativisticAverageLoss(discriminator, type_="D")
     
     # The weights of generator trained during Phase #1
     # is used to initialize or "hot start" the generator
     # for phase #2 of training
     hot_start = tf.train.Checkpoint(G=generator, G_optimizer=G_optimizer)
-    
     utils.load_checkpoint(hot_start, "train_psnr")
 
     checkpoint = tf.train.Checkpoint(
@@ -154,7 +152,7 @@ class Training(object):
         # Decaying Learning Rate
         for _step in decay_steps.copy():
           if step >= _step:
-            decay_step.pop()
+            decay_steps.pop()
             G_optimizer.learning_rate.assign(
                 G_optimizer.learning_rate * decay_factor)
             D_optimizer.learning_rate.assign(
@@ -163,11 +161,11 @@ class Training(object):
        # Calculating Loss applying gradients
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
           fake = generator(image_lr)
-          L_percep = perceptual_loss(image_hr, fake)
-          L1 = utils.pixel_loss(image_hr, fake)
-          L_RaG = Ra_G(image_hr, fake)
-          disc_loss = Ra_D(image_hr, fake)
-          gen_loss = L_percep + lambda_ * L_RaG + eta * L1
+          percep_loss = perceptual_loss(image_hr, fake)
+          l1_loss = utils.pixel_loss(image_hr, fake)
+          loss_RaG = ra_gen(image_hr, fake)
+          disc_loss = ra_disc(image_hr, fake)
+          gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
           disc_metric(disc_loss)
           gen_metric(gen_loss)
         disc_grad = disc_tape.gradient(
@@ -188,7 +186,7 @@ class Training(object):
         # Logging and Checkpointing
         if not step % 100:
           logging.info("Epoch: {}\tBatch: {}\tGen Loss: {}\tDisc Loss: {}\t Time Taken: {} sec".format(
-              (epoch + 1), steps // (epoch + 1),
+              (epoch + 1), step // (epoch + 1),
               gen_metric.result().numpy(),
               disc_metric.result().numpy(), time.time() - start))
           utils.save_checkpoint(checkpoint, "train_combined")

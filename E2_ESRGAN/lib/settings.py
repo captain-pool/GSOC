@@ -1,5 +1,5 @@
-import yaml
 import os
+import yaml
 
 
 def singleton(cls):
@@ -15,8 +15,8 @@ def singleton(cls):
 @singleton
 class settings(object):
   def __init__(self, filename="config.yaml"):
-    with open(filename, "r") as f:
-      self.__data = yaml.load(f.read())
+    with open(filename, "r") as file_:
+      self.__data = yaml.load(file_.read())
       self.__path = os.path.abspath(os.path.dirname(filename))
 
   @property
@@ -33,8 +33,8 @@ class settings(object):
 class stats(object):
   def __init__(self, filename="stats.yaml"):
     if os.path.exists(filename):
-      with open(filename, "r") as f:
-        self.__data = yaml.load(f.read())
+      with open(filename, "r") as file_:
+        self.__data = yaml.load(file_.read())
     else:
       self.__data = {}
     self.file = filename
@@ -47,5 +47,5 @@ class stats(object):
 
   def __setitem__(self, index, data):
     self.__data[index] = data
-    with open(self.file, "w") as f:
-      yaml.dump(self.__data, f, default_flow_style=False)
+    with open(self.file, "w") as file_:
+      yaml.dump(self.__data, file_, default_flow_style=False)

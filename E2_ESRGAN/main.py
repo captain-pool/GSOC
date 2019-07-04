@@ -9,21 +9,21 @@ def main(**kwargs):
   sett = settings.settings(kwargs["config"])
   stats = settings.stats(os.path.join(sett.path, "stats.yaml"))
   summary_writer = tf.summary.create_file_writer(kwargs["logdir"])
-  Generator = model.RDBNet(out_channel=3)
-  Discriminator = model.VGGArch()
-  training = train.Training(
+  generator = model.RDBNet(out_channel=3)
+  discriminator = model.VGGArch()
+  training = train.Trainer(
       summary_writer=summary_writer,
       settings=sett,
       data_dir=kwargs["data_dir"])
 
   if not stats["train_step_1"]:
-    training.warmup_generator(Generator)
+    training.warmup_generator(generator)
     stats["train_step_1"] = True
   if not stats["train_step_2"]:
-    training.train_gan(Generator, Discriminator)
+    training.train_gan(generator, discriminator)
     stats["train_step_2"] = True
 
-  # TODO (@captain-pool): Implement Generator saver for SavedModel2.0
+  # TODO (@captain-pool): Implement generator saver for SavedModel2.0
 
 
 if __name__ == '__main__':
@@ -37,9 +37,9 @@ if __name__ == '__main__':
   parser.add_argument("--log_dir", None, "Directory to story Summaries.")
   parser.add_argument("-v", "--verbose", action="count", default=0)
   FLAGS, unparsed = parser.parse_known_args()
-  levels = [logging.WARNING, logging.INFO, logging.DEBUG]
-  level = levels[min(FLAGS.verbose, len(levels) - 1)]
+  log_levels = [logging.WARNING, logging.INFO, logging.DEBUG]
+  log_level = log_levels[min(FLAGS.verbose, len(log_levels) - 1)]
   logging.basicConfig(
-      level=level,
+      level=log_level,
       format="%(asctime)s: %(levelname)s: %(message)s")
   main(**vars(FLAGS))
