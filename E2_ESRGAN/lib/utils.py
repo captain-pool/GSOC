@@ -1,5 +1,5 @@
 import tensorflow as tf
-from lib.settings import settings
+from lib import settings
 
 
 def save_checkpoint(checkpoint, training_phase):
@@ -9,7 +9,7 @@ def save_checkpoint(checkpoint, training_phase):
         training_phase: The training phase of the model to load/store the checkpoint for.
                         can be one of the two "phase_1" or "phase_2"
   """
-  dir_ = settings()["checkpoint_path"][training_phase]
+  dir_ = settings.Settings()["checkpoint_path"][training_phase]
   checkpoint.save(file_prefix=dir_)
 
 
@@ -21,7 +21,7 @@ def load_checkpoint(checkpoint, training_phase, assert_consumed=True):
                         can be one of the two "phase_1" or "phase_2"
         assert_consumed: assert all the restored variables are consumed in the model
   """
-  dir_ = settings()["checkpoint_path"][training_phase]
+  dir_ = settings.Settings()["checkpoint_path"][training_phase]
   status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
   if assert_consumed:
     status.assert_consumed()
@@ -111,7 +111,7 @@ class RDB(tf.keras.layers.Layer):
         kernel_size=[3, 3],
         strides=[1, 1], padding="same", use_bias=bias)(x)
     self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
-    self.beta = settings()["RDB"].get("residual_scale_beta", 0.2)
+    self.beta = settings.Settings()["RDB"].get("residual_scale_beta", 0.2)
 
   def call(self, input_):
     x1 = self.lrelu(self.conv(input_))
@@ -130,7 +130,7 @@ class RRDB(tf.keras.layers.Layer):
     self.RDB1 = RDB(out_features)
     self.RDB2 = RDB(out_features)
     self.RDB3 = RDB(out_features)
-    self.beta = settings()["RDB"].get("residual_scale_beta", 0.2)
+    self.beta = settings.Settings()["RDB"].get("residual_scale_beta", 0.2)
 
   def call(self, input_):
     out = self.RDB1(input_)

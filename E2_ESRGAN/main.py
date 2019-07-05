@@ -6,8 +6,8 @@ import tensorflow as tf
 
 
 def main(**kwargs):
-  sett = settings.settings(kwargs["config"])
-  stats = settings.stats(os.path.join(sett.path, "stats.yaml"))
+  sett = settings.Settings(kwargs["config"])
+  Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
   summary_writer = tf.summary.create_file_writer(kwargs["logdir"])
   generator = model.RDBNet(out_channel=3)
   discriminator = model.VGGArch()
@@ -16,12 +16,12 @@ def main(**kwargs):
       settings=sett,
       data_dir=kwargs["data_dir"])
 
-  if not stats["train_step_1"]:
+  if not Stats["train_step_1"]:
     training.warmup_generator(generator)
-    stats["train_step_1"] = True
-  if not stats["train_step_2"]:
+    Stats["train_step_1"] = True
+  if not Stats["train_step_2"]:
     training.train_gan(generator, discriminator)
-    stats["train_step_2"] = True
+    Stats["train_step_2"] = True
 
   # TODO (@captain-pool): Implement generator saver for SavedModel2.0
 
