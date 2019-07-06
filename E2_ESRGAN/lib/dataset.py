@@ -23,7 +23,7 @@ def load_dataset_directory(
         buffer_size=io.DEFAULT_BUFFER_SIZE):
 
   dl_config = tfds.download.DownloadConfig(manual_dir=directory)
-  dataset = (tfds.load("image_label_folder/%s" % name,
+  dataset = (tfds.load("image_label_folder/dataset_name=%s" % name,
                        split="train",
                        as_supervised=True,
                        download_and_prepare_kwargs={"download_config": dl_config})
