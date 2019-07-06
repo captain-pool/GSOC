@@ -1,5 +1,5 @@
 import time
-import logging
+from absl import logging
 import itertools
 from functools import partial
 import tensorflow as tf
@@ -57,8 +57,8 @@ class Trainer(object):
     # Generator Optimizer
     G_optimizer = tf.optimizers.Adam(
         learning_rate=phase_args["adam"]["initial_lr"],
-        beta_0=phase_args["adam"]["beta_0"],
-        beta_1=phase_args["adam"]["beta_1"])
+        beta_1=phase_args["adam"]["beta_1"],
+        beta_2=phase_args["adam"]["beta_2"])
 
     checkpoint = tf.train.Checkpoint(
         G=generator,
@@ -118,8 +118,8 @@ class Trainer(object):
     optimizer = partial(
         tf.optimizers.Adam,
         learning_rate=phase_args["adam"]["initial_lr"],
-        beta_0=phase_args["adam"]["beta_0"],
-        beta_1=phase_args["adam"]["beta_1"])
+        beta_1=phase_args["adam"]["beta_1"],
+        beta_2=phase_args["adam"]["beta_2"])
 
     G_optimizer = optimizer()
     D_optimizer = optimizer()

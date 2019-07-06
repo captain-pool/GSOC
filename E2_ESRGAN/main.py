@@ -1,6 +1,6 @@
 import os
 import argparse
-import logging
+from absl import logging
 from lib import settings, train, model
 import tensorflow as tf
 
@@ -41,7 +41,5 @@ if __name__ == '__main__':
   FLAGS, unparsed = parser.parse_known_args()
   log_levels = [logging.WARNING, logging.INFO, logging.DEBUG]
   log_level = log_levels[min(FLAGS.verbose, len(log_levels) - 1)]
-  logging.basicConfig(
-      level=log_level,
-      format="%(asctime)s: %(levelname)s: %(message)s")
+  logging.set_verbosity(log_level)
   main(**vars(FLAGS))

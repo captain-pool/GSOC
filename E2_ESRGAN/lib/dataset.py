@@ -1,4 +1,5 @@
 import io
+from absl import logging
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
@@ -27,9 +28,9 @@ def load_dataset_directory(
                        split="train",
                        as_supervised=True,
                        download_and_prepare_kwargs={"download_config": dl_config})
+             .map(low_res_map_fn)
              .batch(batch_size)
-             .repeat(iterations)
-             .map(low_res_map_fn))
+             .repeat(iterations))
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
   return dataset
@@ -49,9 +50,9 @@ def load_dataset(
                        data_dir=data_dir,
                        split=split,
                        as_supervised=True)
+             .map(low_res_map_fn)
              .batch(batch_size)
-             .repeat(iterations)
-             .map(low_res_map_fn))
+             .repeat(iterations))
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
   return dataset
