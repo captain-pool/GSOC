@@ -58,7 +58,7 @@ class VGGArch(tf.keras.Model):
     self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self.batch_norm = lambda x: tf.keras.layers.BatchNormalization()(x)
     self.dense = tf.keras.layers.Dense
-    self.output_shape = output_shape
+    self._output_shape = output_shape
   def call(self, input_):
 
     features = self.lrelu(self.conv(self.num_features, 1, input_))
@@ -72,5 +72,5 @@ class VGGArch(tf.keras.Model):
 
     flattened = tf.keras.layers.Flatten()(features)
     dense = self.lrelu(self.dense(1024)(flattened))
-    out = self.dense(self.output_shape)(dense)
+    out = self.dense(self._output_shape)(dense)
     return out
