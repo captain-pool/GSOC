@@ -7,7 +7,7 @@ from lib import utils, dataset
 
 class Trainer(object):
   """ Trainer class for ESRGAN """
-  def __init__(self, summary_writer, settings, data_dir=None):
+  def __init__(self, summary_writer, settings, data_dir=None, manual=False):
     """ Setup the values and variables for Training.
         Args:
           summary_writer: tf.summary.SummaryWriter object to write summaries for Tensorboard
@@ -18,14 +18,22 @@ class Trainer(object):
     self.summary_writer = summary_writer
     self.iterations = self.settings["iterations"]
     dataset_args = self.settings["dataset"]
-    self.dataset = dataset.load_dataset(
-        dataset_args["name"],
-        dataset.scale_down(
-            method=dataset_args["scale_method"],
-            dimension=dataset_args["hr_dimension"]),
-        batch_size=settings["batch_size"],
-        data_dir=data_dir)
-
+    if not manual:
+      self.dataset = dataset.load_dataset(
+          dataset_args["name"],
+          dataset.scale_down(
+              method=dataset_args["scale_method"],
+              dimension=dataset_args["hr_dimension"]),
+          batch_size=settings["batch_size"],
+          data_dir=data_dir)
+    else:
+      self.dataset = dataset.load_dataset_directory(
+          dataset_args["name"],
+          data_dir,
+          dataset.scale_down(
+              method=dataset_args["scale_method"],
+              dimension=dataset_args["hr_dimension"]),
+          batch_size=settings["batch_size"])
   def warmup_generator(self, generator):
     """ Training on L1 Loss to warmup the Generator.
 

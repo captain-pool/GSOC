@@ -14,7 +14,8 @@ def main(**kwargs):
   training = train.Trainer(
       summary_writer=summary_writer,
       settings=sett,
-      data_dir=kwargs["data_dir"])
+      data_dir=kwargs["data_dir"],
+      manual=kwargs["manual"])
 
   if not Stats["train_step_1"]:
     training.warmup_generator(generator)
@@ -33,6 +34,7 @@ if __name__ == '__main__':
       "config/config.yaml",
       "Path to configuration file.")
   parser.add_argument("--data_dir", None, "Directory to put the Data.")
+  parser.add_argument("--manual", False, action="store_true", "data_dir is a manual directory")
   parser.add_argument("--model_dir", None, "Directory to put the model in.")
   parser.add_argument("--log_dir", None, "Directory to story Summaries.")
   parser.add_argument("-v", "--verbose", action="count", default=0)
