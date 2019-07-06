@@ -3,9 +3,9 @@ checkpoint_path:
   phase_2: "checkpoints/phase_2"
 
 dataset: 
-  name: "open_images_v4"
+  name: "coco2014"
   scale_method: "bicubic"
-  hr_dimension: 512
+  hr_dimension: 256
 
 # The following configuration is taken from ESRGAN Paper
 # Paper Available at: https://arxiv.org/abs/1809.00219
@@ -29,6 +29,8 @@ train_combined:
   eta: 0.01
   adam:
     initial_lr: 0.0001
+    beta_1: 0.9
+    beta_2: 0.999
     decay:
       factor: 0.5
       step:
