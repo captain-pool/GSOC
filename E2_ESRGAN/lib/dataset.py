@@ -4,7 +4,7 @@ import tensorflow_datasets as tfds
 
 
 def scale_down(method="bicubic", dimension=1024, factor=4):
-  def scale_fn(image, **kwargs):
+  def scale_fn(image, *args, **kwargs):
     high_resolution = tf.image.resize_with_crop_or_pad(
         image, dimension, dimension)
     low_resolution = tf.image.resize(
