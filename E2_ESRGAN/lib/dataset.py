@@ -13,6 +13,28 @@ def scale_down(method="bicubic", dimension=1024, factor=4):
   return scale_fn
 
 
+def load_dataset_directory(
+        name,
+        directory,
+        low_res_map_fn,
+        batch_size=32,
+        iterations=1,
+        shuffle=True,
+        buffer_size=io.DEFAULT_BUFFER_SIZE):
+
+  dl_config = tfds.download.DownloadConfig(manual_dir=directory)
+  dataset = (tfds.load("image_label_folder/dataset_name=%s" % name,
+                       split="train",
+                       as_supervised=True,
+                       download_and_prepare_kwargs={"download_config": dl_config})
+             .batch(batch_size)
+             .repeat(iterations)
+             .map(low_res_map_fn))
+  if shuffle:
+    dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
+  return dataset
+
+
 def load_dataset(
         name,
         low_res_map_fn,
@@ -31,5 +53,5 @@ def load_dataset(
              .repeat(iterations)
              .map(low_res_map_fn))
   if shuffle:
-    dataset = dataset.shuffle(buffer_size, reshuffle_each_iterations=True)
+    dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
   return dataset
