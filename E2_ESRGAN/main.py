@@ -9,7 +9,7 @@ def main(**kwargs):
   sett = settings.Settings(kwargs["config"])
   Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
   summary_writer = tf.summary.create_file_writer(kwargs["log_dir"])
-  generator = model.RDBNet(out_channel=3)
+  generator = model.RRDBNet(out_channel=3)
   discriminator = model.VGGArch()
   training = train.Trainer(
       summary_writer=summary_writer,
