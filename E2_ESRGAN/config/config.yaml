@@ -1,0 +1,38 @@
+checkpoint_path:
+  phase_1: "checkpoints/phase_1"
+  phase_2: "checkpoints/phase_2"
+
+dataset: 
+  name: "open_images_v4"
+  scale_method: "bicubic"
+  hr_dimension: 512
+
+# The following configuration is taken from ESRGAN Paper
+# Paper Available at: https://arxiv.org/abs/1809.00219
+
+RDB:
+  residual_scale_beta: 0.2
+#Training
+# warmup_num_iter: 1000 # Number of steps to train the PSNR model
+batch_size: 128
+iterations: 2
+train_psnr:
+  adam:
+    initial_lr: 0.0002
+    decay:
+      factor: 0.5
+      step: 200000 
+    beta_1: 0.9
+    beta_2: 0.999
+train_combined:
+  lambda: 0.005
+  eta: 0.01
+  adam:
+    initial_lr: 0.0001
+    decay:
+      factor: 0.5
+      step:
+        - 50000
+        - 100000
+        - 200000
+        - 300000
