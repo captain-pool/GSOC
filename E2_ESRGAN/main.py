@@ -1,4 +1,5 @@
 import os
+from functools import partial
 import argparse
 from absl import logging
 from lib import settings, train, model
@@ -26,7 +27,15 @@ def main(**kwargs):
     training.train_gan(generator, discriminator)
     Stats["train_step_2"] = True
 
-  # TODO (@captain-pool): Implement generator saver for SavedModel2.0
+  elif Stats["train_step_1"]:
+    # Attempting to save "Interpolated" Model as SavedModel2.0
+    psnr_generator = model.RRDBNet(out_channel=3)
+    interpolated_generator = utils.interpolate_generator(
+        partial(model.RRDBNet, out_channel=3),
+        discriminator,
+        sett["interpolation_parameter"])
+
+    tf.saved_model.save(interpolated_generator, kwargs["model_dir"])
 
 
 if __name__ == '__main__':

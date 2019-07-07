@@ -1,3 +1,4 @@
+from functools import partial
 import tensorflow as tf
 from lib import settings
 
@@ -26,6 +27,40 @@ def load_checkpoint(checkpoint, training_phase, assert_consumed=True):
     status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
     if assert_consumed:
       status.assert_consumed()
+
+
+def interpolate_generator(generator_fn, discriminator, alpha):
+  r""" Refer to Section 3.4 of https://arxiv.org/pdf/1809.00219.pdf (Xintao et. al.)
+
+      Interpolates between the weights($ \theta_G^{INTERP} $) of the PSNR model and GAN model
+      $ \theta_G^{INTERP} = (1 - \alpha) \theta_G^{PSNR} + \alpha \theta_G^{GAN}
+
+      Args:
+        generator_fn: function which returns the keras model the generator used.
+        discriminiator: Keras model of the discriminator
+        alpha: interpolation parameter between both the weights of both the models
+  """
+
+  assert alpha >= 0 and alpha <= 1
+
+  optimizer = partial(tf.optimizers.Adam)
+  gan_generator = generator_fn()
+  psnr_generator = generator_fn()
+
+  phase_1_ckpt = tf.train.Checkpoint(G=psnr_generator, G_optimizer=optimizer())
+  phase_2_ckpt = tf.train.Checkpoint(
+      G=gan_generator,
+      G_optimizer=optimizer(),
+      D=discriminator,
+      D_optimizer=optimizer())
+
+  load_checkpoint(phase_1_ckpt, "phase_1")
+  load_checkpoint(phase_2_ckpt, "phase_2")
+
+  for variables_1, variables_2 in zip(gan_generator, psnr_generator):
+    variables_1.assign((1 - alpha) * variables_2 + alpha * variables_1)
+
+  return gan_generator
 
 
 def PerceptualLoss(**kwargs):
