@@ -7,7 +7,7 @@ dataset:
   scale_method: "bicubic"
   hr_dimension: 256
 
-print_step: 1000
+print_step: 100
 
 # The following configuration is taken from ESRGAN Paper
 # Paper Available at: https://arxiv.org/abs/1809.00219

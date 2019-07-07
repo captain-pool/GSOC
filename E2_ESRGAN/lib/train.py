@@ -1,7 +1,7 @@
 import time
-from absl import logging
 import itertools
 from functools import partial
+from absl import logging
 import tensorflow as tf
 from lib import utils, dataset
 
@@ -12,10 +12,10 @@ class Trainer(object):
   def __init__(self, summary_writer, settings, data_dir=None, manual=False):
     """ Setup the values and variables for Training.
         Args:
-          summary_writer: tf.summary.SummaryWriter object to write summaries for Tensorboard
-          settings: settings object for fetching data from config files
-          data_dir (default: None): path where the data downloaded should be stored / accessed
-          manual (default: False): boolean to represent if data_dir is a manual dir for image_label_folder.
+          summary_writer: tf.summary.SummaryWriter object to write summaries for Tensorboard.
+          settings: settings object for fetching data from config files.
+          data_dir (default: None): path where the data downloaded should be stored / accessed.
+          manual (default: False): boolean to represent if data_dir is a manual dir.
     """
     self.settings = settings
     self.summary_writer = summary_writer
@@ -56,8 +56,9 @@ class Trainer(object):
     decay_factor = decay_params["factor"]
 
     metric = tf.keras.metrics.Mean()
+    psnr_metric = tf.keras.metrics.Mean()
     num_steps = itertools.count(1)
-
+    tf.summary.experimental.set_step(tf.Variable(-1, dtype=tf.int64))
     # Generator Optimizer
     G_optimizer = tf.optimizers.Adam(
         learning_rate=phase_args["adam"]["initial_lr"],
@@ -74,9 +75,10 @@ class Trainer(object):
     # Training starts
     for epoch in range(self.iterations):
       metric.reset_states()
+      psnr_metric.reset_states()
       for image_lr, image_hr in self.dataset:
         step = next(num_steps)
-
+        image_hr = tf.image.convert_image_dtype(image_hr, tf.float32)
         if step % (decay_step - 1):  # Decay Learning Rate
           G_optimizer.learning_rate.assign(
               G_optimizer.learning_rate * decay_factor)
@@ -87,19 +89,29 @@ class Trainer(object):
         with tf.GradientTape() as tape:
           fake = generator(image_lr)
           loss = utils.pixel_loss(image_hr, fake)
+        psnr = psnr_metric(
+            tf.reduce_mean(
+                tf.image.psnr(
+                    fake,
+                    image_hr,
+                    max_val=1.0)))
         gradient = tape.gradient(fake, generator.trainable_variables)
         G_optimizer.apply_gradients(
-            *zip(gradient, generator.trainable_variables))
+            zip(gradient, generator.trainable_variables))
         mean_loss = metric(loss)
 
         with self.summary_writer.as_default():
-          tf.summary.scalar("warmup_loss", mean_loss)
+          summary_step = tf.summary.experimental.get_step()
+          tf.summary.scalar("warmup_loss", mean_loss, step=summary_step)
+          tf.summary.scalar("mean_psnr", psnr, step=summary_step)
+          summary_step.assign_add(1)
 
         if not step % self.settings["print_step"]:
           logging.info(
-              "[WARMUP] Epoch: {}\tBatch: {}\tGenerator Loss: {}\tTime Taken: {} sec".format(
+              "[WARMUP] Epoch: {}\tBatch: {}\tGenerator Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
                   epoch, step // (epoch + 1),
-                  mean_loss.numpy(), time.time() - start_time))
+                  mean_loss.numpy(), psnr.numpy(),
+                  time.time() - start_time))
           if mean_loss < previous_loss:
             utils.save_checkpoint(checkpoint, "phase_1")
           previous_loss = mean_loss
@@ -118,7 +130,7 @@ class Trainer(object):
     lambda_ = phase_args["lambda"]
     eta = phase_args["eta"]
     num_steps = itertools.count(1)
-
+    tf.summary.experimental.set_step(tf.Variable(-1, dtype=tf.int64))
     optimizer = partial(
         tf.optimizers.Adam,
         learning_rate=phase_args["adam"]["initial_lr"],
@@ -152,15 +164,16 @@ class Trainer(object):
 
     gen_metric = tf.keras.metrics.Mean()
     disc_metric = tf.keras.metrics.Mean()
-
+    psnr_metric = tf.keras.metrics.Mean()
     for epoch in range(self.iterations):
       # Resetting Metrics
       gen_metric.reset_states()
       disc_metric.reset_states()
+      psnr_metric.reset_states()
       start = time.time()
       for (image_lr, image_hr) in self.dataset:
-
         step = next(num_steps)
+        image_hr = tf.image.convert_image_dtype(image_hr, tf.float32)
         # Decaying Learning Rate
         for _step in decay_steps.copy():
           if step >= _step:
@@ -180,26 +193,37 @@ class Trainer(object):
           gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
           disc_metric(disc_loss)
           gen_metric(gen_loss)
+        psnr = psnr_metric(
+            tf.reduce_mean(
+                tf.image.psnr(
+                    fake,
+                    image_hr,
+                    max_val=1.0)))
         disc_grad = disc_tape.gradient(
             disc_loss, discriminator.trainable_variables)
         gen_grad = gen_tape.gradient(
             gen_loss, generator.trainable_variables)
         D_optimizer.apply_gradients(
-            *zip(disc_grad, discriminator.trainable_variables))
+            zip(disc_grad, discriminator.trainable_variables))
         G_optimizer.apply_gradients(
-            *zip(gen_grad, generator.trainable_variables))
+            zip(gen_grad, generator.trainable_variables))
 
         # Writing Summary
         with self.summary_writer.as_default():
-          tf.summary.scalar("gen_loss", gen_metric)
-          tf.summary.scalar("disc_loss", disc_metric)
-          tf.summary.image("lr_image", image_lr)
-          tf.summary.image("hr_image", fake)
+          summary_step = tf.summary.experimental.get_step()
+          tf.summary.scalar("gen_loss", gen_metric, step=summary_step)
+          tf.summary.scalar("disc_loss", disc_metric, step=summary_step)
+          tf.summary.scalar("mean_psnr", psnr, step=summary_step)
+          tf.summary.image("lr_image", image_lr, step=summary_step)
+          tf.summary.image("hr_image", fake, step=summary_step)
+          summary_step.assign_add(1)
         # Logging and Checkpointing
         if not step % self.settings["print_step"]:
-          logging.info("Epoch: {}\tBatch: {}\tGen Loss: {}\tDisc Loss: {}\t Time Taken: {} sec".format(
-              (epoch + 1), step // (epoch + 1),
-              gen_metric.result().numpy(),
-              disc_metric.result().numpy(), time.time() - start))
+          logging.info(
+              "Epoch: {}\tBatch: {}\tGen Loss: {}\tDisc Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
+                  (epoch + 1), step // (epoch + 1),
+                  gen_metric.result().numpy(),
+                  disc_metric.result().numpy(), psnr.numpy(),
+                  time.time() - start))
           utils.save_checkpoint(checkpoint, "train_combined")
           start = time.time()
