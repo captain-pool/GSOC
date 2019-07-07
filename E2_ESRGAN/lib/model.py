@@ -59,10 +59,16 @@ class VGGArch(tf.keras.Model):
     self.batch_norm = lambda x: tf.keras.layers.BatchNormalization()(x)
     self.dense = tf.keras.layers.Dense
     self._output_shape = output_shape
+
   def call(self, input_):
 
     features = self.lrelu(self.conv(self.num_features, 1, input_))
-    features = self.lrelu(self.batch_norm(self.conv(self.num_features, 2, features)))
+    features = self.lrelu(
+        self.batch_norm(
+            self.conv(
+                self.num_features,
+                2,
+                features)))
     # VGG Trunk
     for i in range(1, 4):
       for j in range(1, 3):

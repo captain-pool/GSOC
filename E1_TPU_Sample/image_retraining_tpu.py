@@ -14,7 +14,10 @@ flags.DEFINE_integer("batch_size", 16, "Size of each Batch")
 flags.DEFINE_float("learning_rate", 1e-3, "Learning Rate")
 flags.DEFINE_boolean("use_tpu", True, " Use TPU")
 flags.DEFINE_boolean("use_compat", True, "Use OptimizerV1 from compat module")
-flags.DEFINE_integer("max_steps", 1000, "Maximum Number of Steps for TPU Estimator")
+flags.DEFINE_integer(
+    "max_steps",
+    1000,
+    "Maximum Number of Steps for TPU Estimator")
 flags.DEFINE_string(
     "model_dir",
     "model_dir/",
@@ -35,6 +38,7 @@ def resize_and_scale(image, label):
   image = tf.cast(image, tf.float32)
   image = image / tf.reduce_max(tf.gather(image, 0))
   return image, label
+
 
 def input_(mode, batch_size, iterations, **kwargs):
   global NUM_CLASSES
@@ -148,6 +152,7 @@ def main(_):
     predictions = classifer.predict(
         input_fn=lambda params: prepare_input_fn(FLAGS.infer))
     print(predictions)
+
 
 if __name__ == "__main__":
   app.run(main)

@@ -9,6 +9,7 @@ __pycache__/
 env/
 
 # Logs
+logs/
 *.log
 
 #bazel files and symlinks

@@ -11,6 +11,7 @@ import tarfile
 DOWNLOAD_LINK = "https://s3.amazonaws.com/download.onnx/models/opset_8/shufflenet.tar.gz"
 SHUFFLENET_PB = "shufflenet.pb"
 
+
 def load_shufflenet():
   # Download Shufflenet if it doesn't exist
   if not os.path.exists(DOWNLOAD_LINK.split("/")[-1]):

@@ -23,9 +23,9 @@ def load_checkpoint(checkpoint, training_phase, assert_consumed=True):
   """
   dir_ = settings.Settings()["checkpoint_path"][training_phase]
   if tf.io.gfile.exists(dir_):
-      status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
-      if assert_consumed:
-        status.assert_consumed()
+    status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
+    if assert_consumed:
+      status.assert_consumed()
 
 
 def PerceptualLoss(**kwargs):

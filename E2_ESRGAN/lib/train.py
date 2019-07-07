@@ -5,14 +5,17 @@ from functools import partial
 import tensorflow as tf
 from lib import utils, dataset
 
+
 class Trainer(object):
   """ Trainer class for ESRGAN """
+
   def __init__(self, summary_writer, settings, data_dir=None, manual=False):
     """ Setup the values and variables for Training.
         Args:
           summary_writer: tf.summary.SummaryWriter object to write summaries for Tensorboard
           settings: settings object for fetching data from config files
           data_dir (default: None): path where the data downloaded should be stored / accessed
+          manual (default: False): boolean to represent if data_dir is a manual dir for image_label_folder.
     """
     self.settings = settings
     self.summary_writer = summary_writer
@@ -34,6 +37,7 @@ class Trainer(object):
               method=dataset_args["scale_method"],
               dimension=dataset_args["hr_dimension"]),
           batch_size=settings["batch_size"])
+
   def warmup_generator(self, generator):
     """ Training on L1 Loss to warmup the Generator.
 
@@ -131,7 +135,7 @@ class Trainer(object):
             self.settings["dataset"]["hr_dimension"]])
     ra_gen = utils.RelativisticAverageLoss(discriminator, type_="G")
     ra_disc = utils.RelativisticAverageLoss(discriminator, type_="D")
-    
+
     # The weights of generator trained during Phase #1
     # is used to initialize or "hot start" the generator
     # for phase #2 of training
