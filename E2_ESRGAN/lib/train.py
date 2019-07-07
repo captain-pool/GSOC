@@ -91,7 +91,7 @@ class Trainer(object):
         with self.summary_writer.as_default():
           tf.summary.scalar("warmup_loss", mean_loss)
 
-        if not step % 100:
+        if not step % self.settings["print_step"]:
           logging.info(
               "[WARMUP] Epoch: {}\tBatch: {}\tGenerator Loss: {}\tTime Taken: {} sec".format(
                   epoch, step // (epoch + 1),
@@ -192,7 +192,7 @@ class Trainer(object):
           tf.summary.image("lr_image", image_lr)
           tf.summary.image("hr_image", fake)
         # Logging and Checkpointing
-        if not step % 100:
+        if not step % self.settings["print_step"]:
           logging.info("Epoch: {}\tBatch: {}\tGen Loss: {}\tDisc Loss: {}\t Time Taken: {} sec".format(
               (epoch + 1), step // (epoch + 1),
               gen_metric.result().numpy(),
