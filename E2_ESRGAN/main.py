@@ -2,7 +2,7 @@ import os
 from functools import partial
 import argparse
 from absl import logging
-from lib import settings, train, model
+from lib import settings, train, model, utils
 from tensorflow.python.eager import profiler
 import tensorflow as tf
 
@@ -29,7 +29,6 @@ def main(**kwargs):
 
   elif Stats["train_step_1"]:
     # Attempting to save "Interpolated" Model as SavedModel2.0
-    psnr_generator = model.RRDBNet(out_channel=3)
     interpolated_generator = utils.interpolate_generator(
         partial(model.RRDBNet, out_channel=3),
         discriminator,
