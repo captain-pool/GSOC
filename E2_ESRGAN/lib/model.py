@@ -2,8 +2,26 @@ from functools import partial
 import tensorflow as tf
 from lib import utils
 
+""" Keras Models for ESRGAN
+    Classes:
+      RRDBNet: Generator of ESRGAN. (Residual in Residual Network)
+      VGGArch: VGG28 Architecture making the Discriminator ESRGAN
+"""
 
 class RRDBNet(tf.keras.Model):
+  """ Residual in Residual Network consisting of:
+      - Convolution Layers
+      - Residual in Residual Block as the trunk of the model
+      - Pixel Shuffler layers (tf.nn.depth_to_space)
+      - Upscaling Convolutional Layers
+
+      Args:
+        out_channel: number of channels of the fake output image.
+        num_features (default: 32): number of filters to use in the convolutional layers.
+        trunk_size (default: 3): number of Residual in Residual Blocks to form the trunk.
+        growth_channel (default: 32): number of filters to use in the internal convolutional layers.
+        use_bias (default: True): boolean to indicate if bias is to be used in the conv layers.
+  """
   def __init__(
           self,
           out_channel,
@@ -53,6 +71,15 @@ class RRDBNet(tf.keras.Model):
 
 
 class VGGArch(tf.keras.Model):
+  """ Keras Model for VGG28 Architecture needed to form
+      the discriminator of the architecture.
+      Args:
+        output_shape (default: 1): output_shape of the generator
+        num_features (default: 64): number of features to be used in the convolutional layers
+                                    a factor of 2**i will be multiplied as per the need
+        use
+
+  """
   def __init__(self, output_shape=1, num_features=64, use_bias=True):
 
     super(VGGArch, self).__init__()

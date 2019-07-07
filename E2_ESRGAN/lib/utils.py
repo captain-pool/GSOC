@@ -2,6 +2,7 @@ from functools import partial
 import tensorflow as tf
 from lib import settings
 
+""" Utility functions needed for training ESRGAN model. """
 
 def save_checkpoint(checkpoint, training_phase):
   """ Saves checkpoint.
@@ -30,18 +31,20 @@ def load_checkpoint(checkpoint, training_phase, assert_consumed=True):
 
 
 def interpolate_generator(generator_fn, discriminator, alpha):
-  r""" Refer to Section 3.4 of https://arxiv.org/pdf/1809.00219.pdf (Xintao et. al.)
+  """ Interpolates between the weights of the PSNR model and GAN model
 
-      Interpolates between the weights($ \theta_G^{INTERP} $) of the PSNR model and GAN model
-      $ \theta_G^{INTERP} = (1 - \alpha) \theta_G^{PSNR} + \alpha \theta_G^{GAN}
+       Refer to Section 3.4 of https://arxiv.org/pdf/1809.00219.pdf (Xintao et. al.)
 
-      Args:
-        generator_fn: function which returns the keras model the generator used.
-        discriminiator: Keras model of the discriminator
-        alpha: interpolation parameter between both the weights of both the models
+       Args:
+         generator_fn: function which returns the keras model the generator used.
+         discriminiator: Keras model of the discriminator.
+         alpha: interpolation parameter between both the weights of both the models.
+
+       Returns:
+         Keras model of a generator with weights interpolated between the PSNR and GAN model.
   """
 
-  assert alpha >= 0 and alpha <= 1
+  assert 0 <= alpha <=1
 
   optimizer = partial(tf.optimizers.Adam)
   gan_generator = generator_fn()
@@ -138,7 +141,7 @@ def RelativisticAverageLoss(non_transformed_disc, type_="G"):
 
 
 class RDB(tf.keras.layers.Layer):
-  """ Residual Dense Block Layer"""
+  """ Residual Dense Block Layer """
 
   def __init__(self, out_features=32, bias=True):
     super(RDB, self).__init__()
@@ -159,7 +162,7 @@ class RDB(tf.keras.layers.Layer):
 
 
 class RRDB(tf.keras.layers.Layer):
-  """ Residual in Residual Block Layer"""
+  """ Residual in Residual Block Layer """
 
   def __init__(self, out_features=32):
     super(RRDB, self).__init__()
