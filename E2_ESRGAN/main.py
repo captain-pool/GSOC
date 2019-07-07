@@ -20,6 +20,7 @@ def main(**kwargs):
   if not Stats["train_step_1"]:
     training.warmup_generator(generator)
     Stats["train_step_1"] = True
+  tf.reset_default_graph()
   if not Stats["train_step_2"]:
     training.train_gan(generator, discriminator)
     Stats["train_step_2"] = True
