@@ -11,7 +11,7 @@ print_step: 100
 
 # The following configuration is taken from ESRGAN Paper
 # Paper Available at: https://arxiv.org/abs/1809.00219
-
+interpolation_parameter: 0.8 # Interpolation parameter: 0 <= value <= 1
 RDB:
   residual_scale_beta: 0.2
 #Training
