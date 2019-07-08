@@ -4,12 +4,31 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 
-def scale_down(method="bicubic", dimension=1024, factor=4):
+def scale_down(
+        method="bicubic",
+        dimension=1024,
+        factor=4,
+        brightness_delta=0.2):
+
   def scale_fn(image, *args, **kwargs):
-    high_resolution = tf.image.resize_with_crop_or_pad(
-        image, dimension, dimension)
+
+    if image.shape[0] >= dimension and image.shape[1] >= dimension:
+      high_resolution = tf.image.random.crop(
+          dimension, dimension, image.shape[-1])
+    else:
+      high_resolution = tf.image.resize_with_crop_or_pad(
+          image, dimension, dimension)
+
+    high_resolution = tf.image.random_flip_left_right(high_resolution)
+    high_resolution = tf.image.random_flip_up_down(high_resolution)
+    high_resolution = tf.image.random_brightness(
+        high_resolution, delta=brightness_delta)
+
     low_resolution = tf.image.resize(
-        image, [dimension // factor, dimension // factor], method=method)
+        high_resolution,
+        [dimension // factor, dimension // factor],
+        method=method)
+
     return (low_resolution, high_resolution)
   return scale_fn
 
