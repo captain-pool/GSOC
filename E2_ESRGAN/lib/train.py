@@ -78,7 +78,6 @@ class Trainer(object):
       psnr_metric.reset_states()
       for image_lr, image_hr in self.dataset:
         step = next(num_steps)
-        image_hr = tf.image.convert_image_dtype(image_hr, tf.float32)
         if step % (decay_step - 1):  # Decay Learning Rate
           G_optimizer.learning_rate.assign(
               G_optimizer.learning_rate * decay_factor)
@@ -173,7 +172,6 @@ class Trainer(object):
       start = time.time()
       for (image_lr, image_hr) in self.dataset:
         step = next(num_steps)
-        image_hr = tf.image.convert_image_dtype(image_hr, tf.float32)
         # Decaying Learning Rate
         for _step in decay_steps.copy():
           if step >= _step:
