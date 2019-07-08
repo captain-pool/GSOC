@@ -12,5 +12,11 @@ env/
 logs/
 *.log
 
-#bazel files and symlinks
+# checkpoints
+checkpoints/
+
+# cache
+cache/
+
+# bazel files and symlinks
 bazel-*

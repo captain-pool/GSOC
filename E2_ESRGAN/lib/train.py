@@ -94,7 +94,7 @@ class Trainer(object):
                 tf.image.psnr(
                     fake,
                     image_hr,
-                    max_val=1.0)))
+                    max_val=256.0)))
         gradient = tape.gradient(fake, generator.trainable_variables)
         G_optimizer.apply_gradients(
             zip(gradient, generator.trainable_variables))
@@ -198,7 +198,7 @@ class Trainer(object):
                 tf.image.psnr(
                     fake,
                     image_hr,
-                    max_val=1.0)))
+                    max_val=256.0)))
         disc_grad = disc_tape.gradient(
             disc_loss, discriminator.trainable_variables)
         gen_grad = gen_tape.gradient(

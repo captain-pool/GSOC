@@ -1,12 +1,47 @@
 import os
+from functools import partial
 import argparse
 from absl import logging
-from lib import settings, train, model
+from lib import settings, train, model, utils
 from tensorflow.python.eager import profiler
 import tensorflow as tf
 
+""" Enhanced Super Resolution GAN.
+
+		Citation:
+			 @article{DBLP:journals/corr/abs-1809-00219,
+				author    = {Xintao Wang and
+										 Ke Yu and
+										 Shixiang Wu and
+										 Jinjin Gu and
+										 Yihao Liu and
+										 Chao Dong and
+										 Chen Change Loy and
+										 Yu Qiao and
+										 Xiaoou Tang},
+				title     = {{ESRGAN:} Enhanced Super-Resolution Generative Adversarial Networks},
+				journal   = {CoRR},
+				volume    = {abs/1809.00219},
+				year      = {2018},
+				url       = {http://arxiv.org/abs/1809.00219},
+				archivePrefix = {arXiv},
+				eprint    = {1809.00219},
+				timestamp = {Fri, 05 Oct 2018 11:34:52 +0200},
+				biburl    = {https://dblp.org/rec/bib/journals/corr/abs-1809-00219},
+				bibsource = {dblp computer science bibliography, https://dblp.org}
+			}
+
+"""
 
 def main(**kwargs):
+  """ Main function for training ESRGAN model and exporting it as a SavedModel2.0
+      Args:
+        config: path to config yaml file.
+        log_dir: directory to store summary for tensorboard.
+        data_dir: directory to store / access the dataset.
+        manual: boolean to denote if data_dir is a manual directory.
+        model_dir: directory to store the model into.
+  """
   sett = settings.Settings(kwargs["config"])
   Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
   summary_writer = tf.summary.create_file_writer(kwargs["log_dir"])
@@ -18,15 +53,22 @@ def main(**kwargs):
       settings=sett,
       data_dir=kwargs["data_dir"],
       manual=kwargs["manual"])
-
-  if not Stats["train_step_1"]:
+  phases = list(map(lambda x: x.strip(), kwargs["phases"].lower().split("_")))
+  if not Stats["train_step_1"] and "phase1" in phases:
     training.warmup_generator(generator)
     Stats["train_step_1"] = True
-  if not Stats["train_step_2"]:
+  if not Stats["train_step_2"] and "phase2" in phases:
     training.train_gan(generator, discriminator)
     Stats["train_step_2"] = True
 
-  # TODO (@captain-pool): Implement generator saver for SavedModel2.0
+  elif Stats["train_step_1"]:
+    # Attempting to save "Interpolated" Model as SavedModel2.0
+    interpolated_generator = utils.interpolate_generator(
+        partial(model.RRDBNet, out_channel=3),
+        discriminator,
+        sett["interpolation_parameter"])
+
+    tf.saved_model.save(interpolated_generator, kwargs["model_dir"])
 
 
 if __name__ == '__main__':
@@ -52,6 +94,10 @@ if __name__ == '__main__':
       "--log_dir",
       default=None,
       help="directory to story summaries for tensorboard.")
+  parser.add_argument(
+      "--phases",
+      default="phase1_phase2",
+      help="phases to train for seperated by '_'")
   parser.add_argument(
       "-v",
       "--verbose",
