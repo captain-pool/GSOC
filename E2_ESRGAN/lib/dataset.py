@@ -32,36 +32,54 @@ def augment_image(
   def augment_fn(low_resolution, high_resolution, *args, **kwargs):
 
     # Randomly returning unchanged data (~20%)
-    if tf.less_equal(tf.random.uniform([]), 0.2):
-      return low_resolution, high_resolution
+    return tf.cond(
+        tf.less_equal(tf.random.uniform([]), 0.2),
+        lambda: (low_resolution, high_resolution),
+        augment_steps_fn)
+    # Augment data for rest of data (~ 80%)
+    def augment_steps_fn():
+      # Randomly rotating image (~50%)
+      high_resolution = tf.cond(
+          tf.less_equal(tf.random.uniform([]), 0.5),
+          lambda: tf.image.rot90(
+              high_resolution,
+              tf.random.uniform(
+                  minval=1,
+                  maxval=4,
+                  dtype=tf.int32,
+                  shape=[])),
+          lambda: high_resolution)
+      # Randomly flipping image (~50%)
+      high_resolution = tf.cond(
+          tf.less_equal(tf.random.uniform([]), 0.5),
+          lambda: tf.image.random_flip_left_right(high_resolution),
+          lambda: high_resolution)
 
-    # Randomly rotating image (~50%)
-    if tf.less_equal(tf.random.uniform([]), 0.5):
-      high_resolution = tf.image.rot90(
-          high_resolution, tf.random.uniform(
-              minval=1, maxval=4, dtype=tf.int32, shape=[]))
+      # Randomly setting brightness of image (~50%)
+      high_resolution = tf.cond(
+          tf.less_equal(tf.random.uniform([]), 0.5),
+          lambda: tf.image.random_brightness(
+              high_resolution,
+              max_delta=brightness_delta),
+          lambda: high_resolution)
 
-    # Randomly flipping image (~50%)
-    if tf.less_equal(tf.random.uniform([]), 0.5):
-      high_resolution = tf.image.random_flip_left_right(high_resolution)
+      # Randomly setting constrast (~50%)
+      if contrast_factor:
+        high_resolution = tf.cond(
+            tf.less_equal(tf.random.uniform([]), 0.5),
+            lambda: tf.image.random_contrast(
+                high_resolution, *contrast_factor),
+            lambda: high_resolution)
 
-    # Randomly setting brightness of image (~50%)
-    if tf.less_equal(tf.random.uniform([]), 0.5):
-      high_resolution = tf.image.random_brightness(
-          high_resolution, max_delta=brightness_delta)
+      # Randomly setting saturation(~50%)
+      if saturation:
+        high_resolution = tf.cond(
+            tf.less_equal(tf.random.uniform([]), 0.5),
+            lambda: tf.image.random_saturation(
+                high_resolution, *saturation),
+            lambda: high_resolution)
 
-    # Randomly setting constrast (~50%)
-    if contrast_factor and tf.less_equal(tf.random.uniform([]), 0.5):
-      high_resolution = tf.image.random_contrast(
-          high_resolution, *contrast_factor)
-
-    # Randomly setting saturation(~50%)
-    if saturation and tf.less_equal(tf.random.uniform([]), 0.5):
-      high_resolution = tf.image.random_saturation(
-          high_resolution, *saturation)
-
-    low_resolution, high_resolution = low_res_map_fn(high_resolution)
-    return low_resolution, high_resolution
+      return low_res_map_fn(high_resolution)
   return augment_fn
 
 
@@ -82,7 +100,6 @@ def load_dataset_directory(
         directory,
         low_res_map_fn,
         batch_size=32,
-        iterations=1,
         shuffle=True,
         augment=True,
         cache_dir="cache/",
@@ -124,7 +141,6 @@ def load_dataset(
         low_res_map_fn,
         split="train",
         batch_size=32,
-        iterations=1,
         shuffle=True,
         augment=True,
         buffer_size=io.DEFAULT_BUFFER_SIZE,
