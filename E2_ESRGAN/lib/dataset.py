@@ -30,26 +30,36 @@ def augment_image(
         saturation=[0.6, 1.6]):
   """ helper function used for augmentation of images in the dataset. """
   def augment_fn(low_resolution, high_resolution, *args, **kwargs):
-
-    if not tf.random.uniform(minval=0, maxval=5, shape=[], dtype=tf.int32):
-      # choosing integers from an uniform distribution on [0, 5)
-      # returns 0 with a probabilty of 20% (1 / (5 - 0) = 1/5)
-      # Roughly returning 20% of data without applying augmentation
+    
+    # Randomly returning unchanged data (~20%)
+    if tf.random.uniform([]) <= 0.2:
       return low_resolution, high_resolution
-
-    high_resolution = tf.image.rot90(
-        high_resolution, tf.random.uniform(
-            minval=1, maxval=5, dtype=tf.int32, shape=[]))
-    high_resolution = tf.image.random_flip_left_right(high_resolution)
-    high_resolution = tf.image.random_flip_up_down(high_resolution)
-    high_resolution = tf.image.random_brightness(
-        high_resolution, max_delta=brightness_delta)
-    if contrast_factor:
+    
+    # Randomly rotating image (~50%)
+    if tf.random.uniform([]) <= 0.5:
+      high_resolution = tf.image.rot90(
+          high_resolution, tf.random.uniform(
+              minval=1, maxval=4, dtype=tf.int32, shape=[]))
+    
+    # Randomly flipping image (~50%)
+    if tf.random.uniform([]) <= 0.5:
+      high_resolution = tf.image.random_flip_left_right(high_resolution)
+    
+    # Randomly setting brightness of image (~50%)
+    if tf.random.uniform([]) <= 0.5:
+      high_resolution = tf.image.random_brightness(
+          high_resolution, max_delta=brightness_delta)
+    
+    # Randomly setting constrast (~50%)
+    if contrast_factor and tf.random.uniform([]) <= 0.5:
       high_resolution = tf.image.random_contrast(
           high_resolution, *contrast_factor)
-    if saturation:
+    
+    # Randomly setting saturation(~50%)
+    if saturation and tf.random.uniform([]) <= 0.5:
       high_resolution = tf.image.random_saturation(
           high_resolution, *saturation)
+    
     low_resolution, high_resolution = low_res_map_fn(high_resolution)
     return low_resolution, high_resolution
   return augment_fn
