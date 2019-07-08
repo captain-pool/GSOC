@@ -5,13 +5,9 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 
-def scale_down(
-        method="bicubic",
-        dimension=1024,
-        factor=4,
-        brightness_delta=0.2):
+def scale_down(method="bicubic", dimension=1024, factor=4):
+  
   def scale_fn(image, *args, **kwargs):
-
     high_resolution = image
     if not kwargs.get("no_random_crop", None):
       high_resolution = tf.image.random_crop(
@@ -24,6 +20,7 @@ def scale_down(
     low_resolution = tf.clip_by_value(low_resolution, 0, 255)
     high_resolution = tf.clip_by_value(high_resolution, 0, 255)
     return low_resolution, high_resolution
+  scale_fn.dimension = dimension
   return scale_fn
 
 
@@ -32,6 +29,7 @@ def augment_image(
         brightness_delta=0.05,
         contrast_factor=[0.7, 1.3],
         saturation=[0.6, 1.6]):
+  
   def augment_fn(_, high_resolution, *args, **kwargs):
     high_resolution = tf.image.random_flip_left_right(high_resolution)
     high_resolution = tf.image.random_flip_up_down(high_resolution)
@@ -73,6 +71,7 @@ def load_dataset_directory(
   if not tf.io.gfile.exists(cache_dir):
     tf.io.gfile.mkdir(cache_dir)
   dl_config = tfds.download.DownloadConfig(manual_dir=directory)
+
   dataset = reform_dataset(
       tfds.load(
           "image_label_folder/dataset_name=%s" %
@@ -81,15 +80,20 @@ def load_dataset_directory(
           as_supervised=True,
           download_and_prepare_kwargs={
               "download_config": dl_config}),
-      (tf.float32,
-       tf.float32))
-  dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-             .batch(batch_size)
-             .prefetch(buffer_size)
-             .cache(cache_dir))
+      (tf.float32, tf.float32))
+
+  dataset = (dataset.filter(
+      lambda image, *args: tf.greater_equal(
+          image.shape[:-1],
+          2 * [low_res_map_fn.dimension]).numpy().all())
+      .map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+      .batch(batch_size)
+      .prefetch(buffer_size)
+      .cache(cache_dir))
+
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
-  # Repeat step should be after shuffle for lower memory footprint
+
   if augment:
     dataset = dataset.map(
         augment_image(
@@ -119,14 +123,20 @@ def load_dataset(
           data_dir=data_dir,
           split=split,
           as_supervised=True),
-      (tf.float32,
-       tf.float32))
-  dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-             .batch(batch_size)
-             .prefetch(buffer_size)
-             .cache(cache_dir))
+      (tf.float32, tf.float32))
+  
+  dataset = (dataset.filter(
+      lambda image, *args: tf.greater_equal(
+          image.shape[:-1],
+          2 * [low_res_map_fn.dimension]).numpy().all())
+      .map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+      .batch(batch_size)
+      .prefetch(buffer_size)
+      .cache(cache_dir))
+  
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
+  
   if augment:
     dataset = dataset.map(
         augment_image(
