@@ -5,8 +5,7 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 
-def scale_down(method="bicubic", dimension=1024, factor=4):
-  
+def scale_down(method="bicubic", dimension=256, factor=4):
   def scale_fn(image, *args, **kwargs):
     high_resolution = image
     if not kwargs.get("no_random_crop", None):
@@ -29,8 +28,11 @@ def augment_image(
         brightness_delta=0.05,
         contrast_factor=[0.7, 1.3],
         saturation=[0.6, 1.6]):
-  
+  """ helper function used for augmentation of images in the dataset. """
   def augment_fn(_, high_resolution, *args, **kwargs):
+    high_resolution = tf.image.rot90(
+        high_resolution, tf.random.uniform(
+            minval=1, maxval=5, dtype=tf.int32, shape=[]))
     high_resolution = tf.image.random_flip_left_right(high_resolution)
     high_resolution = tf.image.random_flip_up_down(high_resolution)
     high_resolution = tf.image.random_brightness(
@@ -124,7 +126,7 @@ def load_dataset(
           split=split,
           as_supervised=True),
       (tf.float32, tf.float32))
-  
+
   dataset = (dataset.filter(
       lambda image, *args: tf.greater_equal(
           image.shape[:-1],
@@ -133,10 +135,10 @@ def load_dataset(
       .batch(batch_size)
       .prefetch(buffer_size)
       .cache(cache_dir))
-  
+
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
-  
+
   if augment:
     dataset = dataset.map(
         augment_image(
