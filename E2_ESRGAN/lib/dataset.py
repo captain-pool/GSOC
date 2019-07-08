@@ -32,31 +32,31 @@ def augment_image(
   def augment_fn(low_resolution, high_resolution, *args, **kwargs):
 
     # Randomly returning unchanged data (~20%)
-    if tf.random.uniform([]) <= 0.2:
+    if tf.less_equal(tf.random.uniform([]), 0.2):
       return low_resolution, high_resolution
 
     # Randomly rotating image (~50%)
-    if tf.random.uniform([]) <= 0.5:
+    if tf.less_equal(tf.random.uniform([]), 0.5):
       high_resolution = tf.image.rot90(
           high_resolution, tf.random.uniform(
               minval=1, maxval=4, dtype=tf.int32, shape=[]))
 
     # Randomly flipping image (~50%)
-    if tf.random.uniform([]) <= 0.5:
+    if tf.less_equal(tf.random.uniform([]), 0.5):
       high_resolution = tf.image.random_flip_left_right(high_resolution)
 
     # Randomly setting brightness of image (~50%)
-    if tf.random.uniform([]) <= 0.5:
+    if tf.less_equal(tf.random.uniform([]), 0.5):
       high_resolution = tf.image.random_brightness(
           high_resolution, max_delta=brightness_delta)
 
     # Randomly setting constrast (~50%)
-    if contrast_factor and tf.random.uniform([]) <= 0.5:
+    if contrast_factor and tf.less_equal(tf.random.uniform([]), 0.5):
       high_resolution = tf.image.random_contrast(
           high_resolution, *contrast_factor)
 
     # Randomly setting saturation(~50%)
-    if saturation and tf.random.uniform([]) <= 0.5:
+    if saturation and tf.less_equal(tf.random.uniform([]), 0.5):
       high_resolution = tf.image.random_saturation(
           high_resolution, *saturation)
 
@@ -65,13 +65,14 @@ def augment_image(
   return augment_fn
 
 
-def reform_dataset(dataset, types):
+def reform_dataset(dataset, dimension, types):
   """ Helper function to convert the output_dtype of the dataset
       from (tf.float32, tf.uint8) to desired dtype
   """
   def generator_fn():
     for data in dataset:
-      yield data[0], data[1]
+      if data.shape[0] >= dimension and data.shape[1] >= dimension:
+        yield data[0], data[1]
   return tf.data.Dataset.from_generator(
       generator_fn, types, (tf.TensorShape([None, None, 3]), tf.TensorShape(None)))
 
@@ -99,16 +100,12 @@ def load_dataset_directory(
           as_supervised=True,
           download_and_prepare_kwargs={
               "download_config": dl_config}),
+      low_res_map_fn.dimension,
       (tf.float32, tf.float32))
-
-  dataset = (dataset.filter(
-      lambda image, *args: tf.greater_equal(
-          image.shape[:-1],
-          2 * [low_res_map_fn.dimension]).numpy().all())
-      .map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-      .batch(batch_size)
-      .prefetch(buffer_size)
-      .cache(cache_dir))
+  dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+             .batch(batch_size)
+             .prefetch(buffer_size)
+             .cache(cache_dir))
 
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
@@ -142,16 +139,13 @@ def load_dataset(
           data_dir=data_dir,
           split=split,
           as_supervised=True),
+      low_res_map_fn.dimension,
       (tf.float32, tf.float32))
 
-  dataset = (dataset.filter(
-      lambda image, *args: tf.greater_equal(
-          image.shape[:-1],
-          2 * [low_res_map_fn.dimension]).numpy().all())
-      .map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-      .batch(batch_size)
-      .prefetch(buffer_size)
-      .cache(cache_dir))
+  dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+             .batch(batch_size)
+             .prefetch(buffer_size)
+             .cache(cache_dir))
 
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
