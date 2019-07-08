@@ -29,7 +29,14 @@ def augment_image(
         contrast_factor=[0.7, 1.3],
         saturation=[0.6, 1.6]):
   """ helper function used for augmentation of images in the dataset. """
-  def augment_fn(_, high_resolution, *args, **kwargs):
+  def augment_fn(low_resolution, high_resolution, *args, **kwargs):
+
+    if not tf.random.uniform(minval=0, maxval=5, shape=[], dtype=tf.int32):
+      # choosing integers from an uniform distribution on [0, 5)
+      # returns 0 with a probabilty of 20% (1 / (5 - 0) = 1/5)
+      # Roughly returning 20% of data without applying augmentation
+      return low_resolution, high_resolution
+
     high_resolution = tf.image.rot90(
         high_resolution, tf.random.uniform(
             minval=1, maxval=5, dtype=tf.int32, shape=[]))
@@ -43,8 +50,8 @@ def augment_image(
     if saturation:
       high_resolution = tf.image.random_saturation(
           high_resolution, *saturation)
-    low_res, high_res = low_res_map_fn(high_resolution)
-    return low_res, high_res
+    low_resolution, high_resolution = low_res_map_fn(high_resolution)
+    return low_resolution, high_resolution
   return augment_fn
 
 
