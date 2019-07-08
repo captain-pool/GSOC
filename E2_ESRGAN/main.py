@@ -18,11 +18,11 @@ def main(**kwargs):
       settings=sett,
       data_dir=kwargs["data_dir"],
       manual=kwargs["manual"])
-
-  if not Stats["train_step_1"]:
+  phases = list(map(lambda x: x.strip(), kwargs["phases"].lower().split("_")))
+  if not Stats["train_step_1"] and "phase1" in phases:
     training.warmup_generator(generator)
     Stats["train_step_1"] = True
-  if not Stats["train_step_2"]:
+  if not Stats["train_step_2"] and "phase2" in phases:
     training.train_gan(generator, discriminator)
     Stats["train_step_2"] = True
 
@@ -52,6 +52,10 @@ if __name__ == '__main__':
       "--log_dir",
       default=None,
       help="directory to story summaries for tensorboard.")
+  parser.add_argument(
+      "--phases",
+      default="phase1_phase2",
+      help="phases to train for seperated by '_'")
   parser.add_argument(
       "-v",
       "--verbose",
