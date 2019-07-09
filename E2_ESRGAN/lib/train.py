@@ -34,6 +34,8 @@ class Trainer(object):
           dataset_args["name"],
           data_dir,
           dataset.scale_down(
+              augment=False,
+              shuffle=False,
               method=dataset_args["scale_method"],
               dimension=dataset_args["hr_dimension"]),
           batch_size=settings["batch_size"])
@@ -58,7 +60,7 @@ class Trainer(object):
     metric = tf.keras.metrics.Mean()
     psnr_metric = tf.keras.metrics.Mean()
     num_steps = itertools.count(1)
-    tf.summary.experimental.set_step(tf.Variable(-1, dtype=tf.int64))
+    tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     # Generator Optimizer
     G_optimizer = tf.optimizers.Adam(
         learning_rate=phase_args["adam"]["initial_lr"],
@@ -129,7 +131,7 @@ class Trainer(object):
     lambda_ = phase_args["lambda"]
     eta = phase_args["eta"]
     num_steps = itertools.count(1)
-    tf.summary.experimental.set_step(tf.Variable(-1, dtype=tf.int64))
+    tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     optimizer = partial(
         tf.optimizers.Adam,
         learning_rate=phase_args["adam"]["initial_lr"],
