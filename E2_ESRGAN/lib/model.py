@@ -8,6 +8,7 @@ from lib import utils
       VGGArch: VGG28 Architecture making the Discriminator ESRGAN
 """
 
+
 class RRDBNet(tf.keras.Model):
   """ Residual in Residual Network consisting of:
       - Convolution Layers
@@ -22,6 +23,7 @@ class RRDBNet(tf.keras.Model):
         growth_channel (default: 32): number of filters to use in the internal convolutional layers.
         use_bias (default: True): boolean to indicate if bias is to be used in the conv layers.
   """
+
   def __init__(
           self,
           out_channel,
@@ -47,10 +49,10 @@ class RRDBNet(tf.keras.Model):
 
     self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
 
-  @tf.function(
-      input_signature=[
-          tf.TensorSpec(shape=[None, None, None, 3],
-                        dtype=tf.float32)])
+#  @tf.function(
+#      input_signature=[
+#          tf.TensorSpec(shape=[None, None, None, 3],
+#                        dtype=tf.float32)])
   def call(self, input_):
     feature = self.conv_first(input_)
     trunk = self.conv_trunk(self.rdb_trunk(feature))
@@ -80,6 +82,7 @@ class VGGArch(tf.keras.Model):
         use
 
   """
+
   def __init__(self, output_shape=1, num_features=64, use_bias=True):
 
     super(VGGArch, self).__init__()

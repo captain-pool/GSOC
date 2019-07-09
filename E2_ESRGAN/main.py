@@ -31,6 +31,7 @@ import tensorflow as tf
       }
 """
 
+
 def main(**kwargs):
   """ Main function for training ESRGAN model and exporting it as a SavedModel2.0
       Args:
@@ -64,8 +65,8 @@ def main(**kwargs):
     interpolated_generator = utils.interpolate_generator(
         partial(model.RRDBNet, out_channel=3),
         discriminator,
-        sett["interpolation_parameter"])
-
+        sett["interpolation_parameter"],
+        sett["dataset"]["hr_dimension"])
     tf.saved_model.save(interpolated_generator, kwargs["model_dir"])
 
 

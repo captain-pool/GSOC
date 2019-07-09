@@ -4,6 +4,7 @@ from lib import settings
 
 """ Utility functions needed for training ESRGAN model. """
 
+
 def save_checkpoint(checkpoint, training_phase):
   """ Saves checkpoint.
       Args:
@@ -30,7 +31,12 @@ def load_checkpoint(checkpoint, training_phase, assert_consumed=True):
       status.assert_consumed()
 
 
-def interpolate_generator(generator_fn, discriminator, alpha):
+def interpolate_generator(
+        generator_fn,
+        discriminator,
+        alpha,
+        dimension,
+        factor=4):
   """ Interpolates between the weights of the PSNR model and GAN model
 
        Refer to Section 3.4 of https://arxiv.org/pdf/1809.00219.pdf (Xintao et. al.)
@@ -39,16 +45,24 @@ def interpolate_generator(generator_fn, discriminator, alpha):
          generator_fn: function which returns the keras model the generator used.
          discriminiator: Keras model of the discriminator.
          alpha: interpolation parameter between both the weights of both the models.
-
+         dimension: dimension of the high resolution image
+         factor: scale factor of the model
        Returns:
          Keras model of a generator with weights interpolated between the PSNR and GAN model.
   """
-
-  assert 0 <= alpha <=1
+  # TODO (@captain-pool): Fix bugs
+  assert 0 <= alpha <= 1
 
   optimizer = partial(tf.optimizers.Adam)
   gan_generator = generator_fn()
+  # building generator
+  gan_generator(tf.random.normal(
+      [1, dimension // factor, dimension // factor, 3]))
+
   psnr_generator = generator_fn()
+  # building generator
+  psnr_generator(tf.random.normal(
+      [1, dimension // factor, dimension // factor, 3]))
 
   phase_1_ckpt = tf.train.Checkpoint(G=psnr_generator, G_optimizer=optimizer())
   phase_2_ckpt = tf.train.Checkpoint(
@@ -56,11 +70,11 @@ def interpolate_generator(generator_fn, discriminator, alpha):
       G_optimizer=optimizer(),
       D=discriminator,
       D_optimizer=optimizer())
-
   load_checkpoint(phase_1_ckpt, "phase_1")
   load_checkpoint(phase_2_ckpt, "phase_2")
 
-  for variables_1, variables_2 in zip(gan_generator, psnr_generator):
+  for variables_1, variables_2 in zip(
+          gan_generator.trainable_variables, psnr_generator.trainable_variables):
     variables_1.assign((1 - alpha) * variables_2 + alpha * variables_1)
 
   return gan_generator

@@ -30,14 +30,8 @@ def augment_image(
         saturation=[0.6, 1.6]):
   """ helper function used for augmentation of images in the dataset. """
   def augment_fn(low_resolution, high_resolution, *args, **kwargs):
-
-    # Randomly returning unchanged data (~20%)
-    return tf.cond(
-        tf.less_equal(tf.random.uniform([]), 0.2),
-        lambda: (low_resolution, high_resolution),
-        augment_steps_fn)
     # Augment data for rest of data (~ 80%)
-    def augment_steps_fn():
+    def augment_steps_fn(low_resolution, high_resolution):
       # Randomly rotating image (~50%)
       high_resolution = tf.cond(
           tf.less_equal(tf.random.uniform([]), 0.5),
@@ -80,6 +74,13 @@ def augment_image(
             lambda: high_resolution)
 
       return low_res_map_fn(high_resolution)
+
+    # Randomly returning unchanged data (~20%)
+    return tf.cond(
+        tf.less_equal(tf.random.uniform([]), 0.2),
+        lambda: (low_resolution, high_resolution),
+        partial(augment_steps_fn, low_resolution, high_resolution))
+
   return augment_fn
 
 
@@ -89,8 +90,10 @@ def reform_dataset(dataset, dimension, types):
   """
   def generator_fn():
     for data in dataset:
-      if data.shape[0] >= dimension and data.shape[1] >= dimension:
+      if data[0].shape[0] >= dimension and data[0].shape[1] >= dimension:
         yield data[0], data[1]
+      else:
+        continue
   return tf.data.Dataset.from_generator(
       generator_fn, types, (tf.TensorShape([None, None, 3]), tf.TensorShape(None)))
 
@@ -103,12 +106,12 @@ def load_dataset_directory(
         shuffle=True,
         augment=True,
         cache_dir="cache/",
-        buffer_size=io.DEFAULT_BUFFER_SIZE):
+        buffer_size=3 * 32):
 
   if not tf.io.gfile.exists(cache_dir):
     tf.io.gfile.mkdir(cache_dir)
   dl_config = tfds.download.DownloadConfig(manual_dir=directory)
-
+  logging.info(low_res_map_fn.dimension)
   dataset = reform_dataset(
       tfds.load(
           "image_label_folder/dataset_name=%s" %
