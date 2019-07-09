@@ -1,11 +1,31 @@
+# Copyright 2019 The TensorFlow Hub Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
+from functools import partial
+
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import tensorflow_hub as hub
 from tensorflow.python.tpu import tpu_estimator
 from tensorflow.python.tpu import tpu_optimizer
 from tensorflow.python.tpu import tpu_config
-from functools import partial
 from absl import flags, app
 
 flags.DEFINE_string("tpu", None, "TPU Address")
@@ -143,7 +163,6 @@ def main(_):
         max_steps=FLAGS.max_steps)
   except Exception:
     pass
-  # TODO(@captain-pool): Implement Evaluation
   if FLAGS.infer:
     def prepare_input_fn(path):
       img = tf.image.decode_image(tf.io.read_file(path))

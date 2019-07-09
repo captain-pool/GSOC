@@ -30,7 +30,7 @@ def augment_image(
         saturation=[0.6, 1.6]):
   """ helper function used for augmentation of images in the dataset. """
   def augment_fn(low_resolution, high_resolution, *args, **kwargs):
-    # Augment data for rest of data (~ 80%)
+    # Augmenting data (~ 80%)
     def augment_steps_fn(low_resolution, high_resolution):
       # Randomly rotating image (~50%)
       high_resolution = tf.cond(

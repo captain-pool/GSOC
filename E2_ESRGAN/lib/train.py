@@ -96,7 +96,7 @@ class Trainer(object):
                     fake,
                     image_hr,
                     max_val=256.0)))
-        gradient = tape.gradient(fake, generator.trainable_variables)
+        gradient = tape.gradient(loss, generator.trainable_variables)
         G_optimizer.apply_gradients(
             zip(gradient, generator.trainable_variables))
         mean_loss = metric(loss)
