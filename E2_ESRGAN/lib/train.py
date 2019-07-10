@@ -66,7 +66,8 @@ class Trainer(object):
         beta_2=phase_args["adam"]["beta_2"])
     checkpoint = tf.train.Checkpoint(
         G=generator,
-        G_optimizer=G_optimizer)
+        G_optimizer=G_optimizer,
+        summary_step=tf.summary.experimental.get_step())
 
     status = utils.load_checkpoint(checkpoint, "phase_1")
     logging.debug("phase_1 status object: {}".format(status))
@@ -162,7 +163,9 @@ class Trainer(object):
             self.settings["checkpoint_path"]["phase_2"],
             "checkpoint")):
       hot_start = tf.train.Checkpoint(
-          G=generator, G_optimizer=G_optimizer)
+          G=generator,
+          G_optimizer=G_optimizer,
+          summary_step=tf.summary.experimental.get_step())
       status = utils.load_checkpoint(hot_start, "train_psnr")
 
     else:
