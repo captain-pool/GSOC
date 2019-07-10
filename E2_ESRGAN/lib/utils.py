@@ -165,7 +165,7 @@ class RDB(tf.keras.layers.Layer):
   def __init__(self, out_features=32, bias=True):
     super(RDB, self).__init__()
 
-    def _create_conv2d(): return tf.keras.layers.Conv2D(
+    _create_conv2d = partial(tf.keras.layers.Conv2D,
         out_features,
         kernel_size=[3, 3],
         strides=[1, 1], padding="same", use_bias=bias)
