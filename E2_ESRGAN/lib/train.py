@@ -34,8 +34,6 @@ class Trainer(object):
           dataset_args["name"],
           data_dir,
           dataset.scale_down(
-              augment=False,
-              shuffle=False,
               method=dataset_args["scale_method"],
               dimension=dataset_args["hr_dimension"]),
           batch_size=settings["batch_size"])

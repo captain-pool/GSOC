@@ -1,5 +1,7 @@
+import os
 from functools import partial
 import tensorflow as tf
+from absl import logging
 from lib import settings
 
 """ Utility functions needed for training ESRGAN model. """
@@ -13,6 +15,7 @@ def save_checkpoint(checkpoint, training_phase):
                         can be one of the two "phase_1" or "phase_2"
   """
   dir_ = settings.Settings()["checkpoint_path"][training_phase]
+  dir_ = os.path.join(dir_, os.path.basename(dir_))
   checkpoint.save(file_prefix=dir_)
 
 
@@ -25,9 +28,11 @@ def load_checkpoint(checkpoint, training_phase):
         assert_consumed: assert all the restored variables are consumed in the model
   """
   dir_ = settings.Settings()["checkpoint_path"][training_phase]
-  if tf.io.gfile.exists(dir_):
+  if tf.io.gfile.glob(os.path.join(dir_, "*.index")):
     status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
     return status
+
+
 
 def interpolate_generator(
         generator_fn,
