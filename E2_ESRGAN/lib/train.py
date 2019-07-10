@@ -110,16 +110,18 @@ class Trainer(object):
           tf.summary.scalar(
               "warmup_loss", mean_loss, step=summary_step)
           tf.summary.scalar("mean_psnr", psnr, step=summary_step)
-
-          tf.summary.image("fake_image", tf.cast(tf.clip_by_value(
-              fake[:1], 0, 255), tf.uint8), step=summary_step)
-
-          tf.summary("hr_image",
-                     tf.cast(image_hr[:1], tf.uint8),
-                     step=summary_step)
           summary_step.assign_add(1)
 
         if not step % self.settings["print_step"]:
+          summary_step = tf.summary.experimental.get_step()
+          with self.summary_writer.as_default():
+            tf.summary.image("fake_image", tf.cast(tf.clip_by_value(
+                fake[:1], 0, 255), tf.uint8), step=summary_step)
+            tf.summary.image("hr_image",
+                             tf.cast(image_hr[:1], tf.uint8),
+                             step=summary_step)
+            summary_step.assign_add(1)
+
           logging.info(
               "[WARMUP] Epoch: {}\tBatch: {}\tGenerator Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
                   epoch, step // (epoch + 1),
@@ -244,16 +246,19 @@ class Trainer(object):
           tf.summary.scalar(
               "disc_loss", disc_metric, step=summary_step)
           tf.summary.scalar("mean_psnr", psnr, step=summary_step)
-
-          tf.summary.image("fake_image", tf.cast(tf.clip_by_value(
-              fake[:1], 0, 255), tf.uint8), step=summary_step)
-
-          tf.summary.image("hr_image",
-                           tf.cast(image_hr[:1], tf.uint8),
-                           step=summary_step)
           summary_step.assign_add(1)
+
         # Logging and Checkpointing
         if not step % self.settings["print_step"]:
+          summary_step = tf.summary.experimental.get_step()
+          with self.summary_writer.as_default():
+            tf.summary.image("fake_image", tf.cast(tf.clip_by_value(
+                fake[:1], 0, 255), tf.uint8), step=summary_step)
+            tf.summary.image("hr_image",
+                             tf.cast(image_hr[:1], tf.uint8),
+                             step=summary_step)
+            summary_step.assign_add(1)
+
           logging.info(
               "Epoch: {}\tBatch: {}\tGen Loss: {}\tDisc Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
                   (epoch + 1), step // (epoch + 1),
