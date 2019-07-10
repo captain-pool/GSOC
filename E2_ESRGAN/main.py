@@ -54,9 +54,11 @@ def main(**kwargs):
       manual=kwargs["manual"])
   phases = list(map(lambda x: x.strip(), kwargs["phases"].lower().split("_")))
   if not Stats["train_step_1"] and "phase1" in phases:
+    logging.info("starting phase 1")
     training.warmup_generator(generator)
     Stats["train_step_1"] = True
   if not Stats["train_step_2"] and "phase2" in phases:
+    logging.info("starting phase 2")
     training.train_gan(generator, discriminator)
     Stats["train_step_2"] = True
 
