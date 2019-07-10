@@ -52,7 +52,8 @@ def main(**kwargs):
       settings=sett,
       data_dir=kwargs["data_dir"],
       manual=kwargs["manual"])
-  phases = list(map(lambda x: x.strip(), kwargs["phases"].lower().split("_")))
+  phases = list(map(lambda x: x.strip(),
+                    kwargs["phases"].lower().split("_")))
   if not Stats["train_step_1"] and "phase1" in phases:
     logging.info("starting phase 1")
     training.warmup_generator(generator)

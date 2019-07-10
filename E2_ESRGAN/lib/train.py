@@ -69,6 +69,7 @@ class Trainer(object):
         G_optimizer=G_optimizer)
 
     status = utils.load_checkpoint(checkpoint, "phase_1")
+    logging.debug("phase_1 status object: {}".format(status))
     previous_loss = float("inf")
     start_time = time.time()
     # Training starts
@@ -96,6 +97,8 @@ class Trainer(object):
 
         if status and step == 1:
           status.assert_consumed()
+          logging.info(
+              "consumed checkpoint for phase_1 successfully")
 
         if step % (decay_step - 1):  # Decay Learning Rate
           G_optimizer.learning_rate.assign(
@@ -103,7 +106,8 @@ class Trainer(object):
 
         with self.summary_writer.as_default():
           summary_step = tf.summary.experimental.get_step()
-          tf.summary.scalar("warmup_loss", mean_loss, step=summary_step)
+          tf.summary.scalar(
+              "warmup_loss", mean_loss, step=summary_step)
           tf.summary.scalar("mean_psnr", psnr, step=summary_step)
           summary_step.assign_add(1)
 
@@ -152,22 +156,25 @@ class Trainer(object):
     # The weights of generator trained during Phase #1
     # is used to initialize or "hot start" the generator
     # for phase #2 of training
-    ckpt_path = self.settings["checkpoint_path"]
     status = None
     if not tf.io.gfile.exists(
         os.path.join(
-            ckpt_path["phase_2"],
+            self.settings["checkpoint_path"]["phase_2"],
             "checkpoint")):
-      hot_start = tf.train.Checkpoint(G=generator, G_optimizer=G_optimizer)
+      hot_start = tf.train.Checkpoint(
+          G=generator, G_optimizer=G_optimizer)
       status = utils.load_checkpoint(hot_start, "train_psnr")
+
     else:
       checkpoint = tf.train.Checkpoint(
           G=generator,
           G_optimizer=G_optimizer,
           D=discriminator,
-          D_optimizer=D_optimizer)
-
+          D_optimizer=D_optimizer,
+          summary_step=tf.summary.experimental.get_step())
       status = utils.load_checkpoint(checkpoint, "train_combined")
+
+    logging.debug("phase status object: {}".format(status))
 
     gen_metric = tf.keras.metrics.Mean()
     disc_metric = tf.keras.metrics.Mean()
@@ -208,6 +215,7 @@ class Trainer(object):
 
         if status and step == 1:
           status.assert_consumed()
+          logging.info("consumed checkpoint successfully!")
 
         # Decaying Learning Rate
         for _step in decay_steps.copy():
@@ -221,8 +229,10 @@ class Trainer(object):
         # Writing Summary
         with self.summary_writer.as_default():
           summary_step = tf.summary.experimental.get_step()
-          tf.summary.scalar("gen_loss", gen_metric, step=summary_step)
-          tf.summary.scalar("disc_loss", disc_metric, step=summary_step)
+          tf.summary.scalar(
+              "gen_loss", gen_metric, step=summary_step)
+          tf.summary.scalar(
+              "disc_loss", disc_metric, step=summary_step)
           tf.summary.scalar("mean_psnr", psnr, step=summary_step)
           tf.summary.image("lr_image", image_lr, step=summary_step)
           tf.summary.image("hr_image", fake, step=summary_step)

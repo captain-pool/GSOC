@@ -27,11 +27,12 @@ def load_checkpoint(checkpoint, training_phase):
                         can be one of the two "phase_1" or "phase_2"
         assert_consumed: assert all the restored variables are consumed in the model
   """
+  logging.info("Loading check point for: %s" % training_phase)
   dir_ = settings.Settings()["checkpoint_path"][training_phase]
-  if tf.io.gfile.glob(os.path.join(dir_, "*.index")):
+  if tf.io.gfile.exists(os.path.join(dir_, "checkpoint")):
+    logging.info("Found checkpoint at: %s" % dir_)
     status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
     return status
-
 
 
 def interpolate_generator(
@@ -67,7 +68,8 @@ def interpolate_generator(
   psnr_generator(tf.random.normal(
       [1, dimension // factor, dimension // factor, 3]))
 
-  phase_1_ckpt = tf.train.Checkpoint(G=psnr_generator, G_optimizer=optimizer())
+  phase_1_ckpt = tf.train.Checkpoint(
+      G=psnr_generator, G_optimizer=optimizer())
   phase_2_ckpt = tf.train.Checkpoint(
       G=gan_generator,
       G_optimizer=optimizer(),
