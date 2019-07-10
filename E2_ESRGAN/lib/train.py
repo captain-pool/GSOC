@@ -66,12 +66,11 @@ class Trainer(object):
         learning_rate=phase_args["adam"]["initial_lr"],
         beta_1=phase_args["adam"]["beta_1"],
         beta_2=phase_args["adam"]["beta_2"])
-
     checkpoint = tf.train.Checkpoint(
         G=generator,
         G_optimizer=G_optimizer)
 
-    utils.load_checkpoint(checkpoint, "phase_1")
+    status = utils.load_checkpoint(checkpoint, "phase_1")
     previous_loss = float("inf")
     start_time = time.time()
     # Training starts
@@ -80,10 +79,6 @@ class Trainer(object):
       psnr_metric.reset_states()
       for image_lr, image_hr in self.dataset:
         step = next(num_steps)
-        if step % (decay_step - 1):  # Decay Learning Rate
-          G_optimizer.learning_rate.assign(
-              G_optimizer.learning_rate * decay_factor)
-
         if warmup_num_iter and step % warmup_num_iter:
           return
 
@@ -100,6 +95,13 @@ class Trainer(object):
         G_optimizer.apply_gradients(
             zip(gradient, generator.trainable_variables))
         mean_loss = metric(loss)
+
+        if status and step == 1:
+          status.assert_consumed()
+
+        if step % (decay_step - 1):  # Decay Learning Rate
+          G_optimizer.learning_rate.assign(
+              G_optimizer.learning_rate * decay_factor)
 
         with self.summary_writer.as_default():
           summary_step = tf.summary.experimental.get_step()
@@ -152,16 +154,22 @@ class Trainer(object):
     # The weights of generator trained during Phase #1
     # is used to initialize or "hot start" the generator
     # for phase #2 of training
-    hot_start = tf.train.Checkpoint(G=generator, G_optimizer=G_optimizer)
-    utils.load_checkpoint(hot_start, "train_psnr")
+    ckpt_path = self.settings["checkpoint_path"]
+    status = None
+    if not tf.io.gfile.exists(
+        os.path.join(
+            ckpt_path["phase_2"],
+            "checkpoint")):
+      hot_start = tf.train.Checkpoint(G=generator, G_optimizer=G_optimizer)
+      status = utils.load_checkpoint(hot_start, "train_psnr")
+    else:
+      checkpoint = tf.train.Checkpoint(
+          G=generator,
+          G_optimizer=G_optimizer,
+          D=discriminator,
+          D_optimizer=D_optimizer)
 
-    checkpoint = tf.train.Checkpoint(
-        G=generator,
-        G_optimizer=G_optimizer,
-        D=discriminator,
-        D_optimizer=D_optimizer)
-
-    utils.load_checkpoint(checkpoint, "train_combined")
+      status = utils.load_checkpoint(checkpoint, "train_combined")
 
     gen_metric = tf.keras.metrics.Mean()
     disc_metric = tf.keras.metrics.Mean()
@@ -174,14 +182,6 @@ class Trainer(object):
       start = time.time()
       for (image_lr, image_hr) in self.dataset:
         step = next(num_steps)
-        # Decaying Learning Rate
-        for _step in decay_steps.copy():
-          if step >= _step:
-            decay_steps.pop()
-            G_optimizer.learning_rate.assign(
-                G_optimizer.learning_rate * decay_factor)
-            D_optimizer.learning_rate.assign(
-                D_optimizer.learning_rate * decay_factor)
 
        # Calculating Loss applying gradients
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
@@ -207,6 +207,18 @@ class Trainer(object):
             zip(disc_grad, discriminator.trainable_variables))
         G_optimizer.apply_gradients(
             zip(gen_grad, generator.trainable_variables))
+
+        if status and step == 1:
+          status.assert_consumed()
+
+        # Decaying Learning Rate
+        for _step in decay_steps.copy():
+          if (step - 1) >= _step:
+            decay_steps.pop()
+            G_optimizer.learning_rate.assign(
+                G_optimizer.learning_rate * decay_factor)
+            D_optimizer.learning_rate.assign(
+                D_optimizer.learning_rate * decay_factor)
 
         # Writing Summary
         with self.summary_writer.as_default():
