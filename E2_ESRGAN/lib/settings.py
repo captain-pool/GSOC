@@ -15,19 +15,19 @@ def singleton(cls):
 @singleton
 class Settings(object):
   def __init__(self, filename="config.yaml"):
-    with open(filename, "r") as file_:
-      self.__data = yaml.load(file_.read())
-      self.__path = os.path.abspath(os.path.dirname(filename))
+    self.__path = os.path.abspath(filename)
 
   @property
   def path(self):
-    return self.__path
+    return os.path.dirname(self.__path)
 
   def __getitem__(self, index):
-    return self.__data[index]
+    with open(self.__path, "r") as file_:
+      return yaml.load(file_.read())[index]
 
   def get(self, index, default=None):
-    return self.__data.get(index, default)
+    with open(self.__path, "r") as file_:
+      return yaml.load(file_.read()).get(index, default)
 
 
 class Stats(object):

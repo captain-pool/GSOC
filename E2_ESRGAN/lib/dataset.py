@@ -1,4 +1,3 @@
-import io
 from absl import logging
 from functools import partial
 import tensorflow as tf
@@ -146,7 +145,7 @@ def load_dataset(
         batch_size=32,
         shuffle=True,
         augment=True,
-        buffer_size=io.DEFAULT_BUFFER_SIZE,
+        buffer_size=3 * 32,
         cache_dir="cache/",
         data_dir=None):
 
