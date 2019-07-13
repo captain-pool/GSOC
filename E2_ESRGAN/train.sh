@@ -8,7 +8,7 @@ function loading() {
     done;
 }
 function wait_for_process() {
-  while [[ `ps aux | grep $1 | wc -l` -le 1 ]]
+  while [[ `ps aux | grep $1 | wc -l` -gt 1 ]]
   do
     loading $2
   done
