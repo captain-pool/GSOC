@@ -1,6 +1,6 @@
 #!/bin/bash
 function loading() {
-  wheel=("-" "\\" "|" "/" "-")
+  wheel=("-" "\\" "|" "/")
   for i in ${wheel[*]}
     do 
       printf "\r[$i] $1"; 
