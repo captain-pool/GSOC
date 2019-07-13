@@ -3,7 +3,7 @@ function loading() {
   wheel=("-" "\\" "|" "/" "-")
   for i in ${wheel[*]}
     do 
-      printf "[\r$i] $1"; 
+      printf "\r[$i] $1"; 
       sleep 0.1;
     done;
 }
