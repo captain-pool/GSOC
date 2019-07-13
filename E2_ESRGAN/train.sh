@@ -10,7 +10,7 @@ function loading() {
 function wait_for_process() {
   while [[ `ps aux | grep $1 | wc -l` -gt 1 ]]
   do
-    loading $2
+    loading "$2"
   done
   wait $1
   return "$?"
@@ -22,14 +22,25 @@ function report_error(){
 # Script Starts Here
 pushd $HOME
 
-pip3 -q install -U tfds-nightly &> pip.log &
-wait_for_process $! "Installing Tensorflow Datasets"
-report_error $? "pip.log"
-printf "\r\033[K[-] Installed Tensorflow Datasets\n"
-pip3 -q install -U tf-hub-nightly &> pip.log &
-wait_for_process $! "Installing Tensorflow Hub"
-report_error $? "pip.log"
-printf "\r\033[K[-] Installed Tensorflow Hub\n"
+python3 -c "import tensorflow_datasets" &>/dev/null
+
+if [[ $? -ne 0 ]]
+then
+	pip3 -q install -U tfds-nightly &> pip.log &
+	wait_for_process $! "Installing Tensorflow Datasets"
+	report_error $? "pip.log"
+	printf "\r\033[K[-] Installed Tensorflow Datasets\n"
+fi
+
+python3 -c "import tensorflow_hub" &>/dev/null
+
+if [[ $? -ne 0 ]]
+then
+	pip3 -q install -U tf-hub-nightly &> pip.log &
+	wait_for_process $! "Installing Tensorflow Hub"
+	report_error $? "pip.log"
+	printf "\r\033[K[-] Installed Tensorflow Hub\n"
+fi
 
 DATASET="gs://images.cocodataset.org/train2014"
 EXTRACTDIR="$HOME/coco2014/train/none"
@@ -83,9 +94,9 @@ popd
 
 TB_PID=$(IFS=' ' pgrep -u root -f tensorboard)
 TB_PID=$(printf ",%s" "${TB_PID[@]}")
-echo "[-] Log of trainig code: $HOME/logdir/main.log"
+echo "[-] Log of training code: $HOME/logdir/main.log"
 echo "[-] Logs of tensorboard: $HOME/logdir/access.log"
-printf "PIDs of created jobs\n"
+printf "\033[1mPIDs of created jobs\033[0m\n"
 echo "[-] PID Tensorboard (root): "${TB_PID:1}
 PY_PID=$(pgrep -u `whoami` -f python3)
 PY_PID=$(printf ",%s" "${PY_PID[@]}")
