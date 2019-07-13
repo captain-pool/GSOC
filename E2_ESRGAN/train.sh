@@ -8,19 +8,13 @@ if [ ! -d "datadir" ]
 then
 	mkdir -p datadir/coco2014/train/none
 	gsutil -m rsync $DATASET $EXTRACTDIR
-	python3 -c "$CODE"
-	[[ $? -ne 0 ]] && echo "Error Parsing to TF Records" && exit 1
+	python3 -c "$CODE" &>parse.log
+	[[ $? -ne 0 ]] && printf "Error Parsing to TF Records. check \"parse.log\"" && exit 1
 
 fi
-
-if [ ! -d "logdir" ]
-then
-	mkdir logdir
-fi
-if [ ! -d "modeldir" ]
-then
-	mkdir modeldir
-fi
+# Creating Log and  Model Dump Directories"
+[ ! -d "logdir" ] && mkdir logdir
+[ ! -d "modeldir" ] &&mkdir modeldir
 
 if [ $(ps aux|grep tensorboard|wc -l) -le 1 ]
 then
@@ -41,7 +35,10 @@ python3 main.py --data_dir $HOME/datadir \
 popd
 TB_PID=$(IFS=' ' pgrep -u root -f tensorboard)
 TB_PID=$(printf ",%s" "${TB_PID[@]}")
-echo "PID Tensorboard (root): "${TB_PID:1}
+echo "[*] Log of trainig code: $HOME/logdir/main.log"
+echo "[*] Logs of tensorboard: $HOME/logdir/access.log"
+printf "PIDs of created jobs\n"
+echo "[*] PID Tensorboard (root): "${TB_PID:1}
 PY_PID=$(pgrep -u `whoami` -f python3)
 PY_PID=$(printf ",%s" "${PY_PID[@]}")
-echo "PID Python3 ($(whoami)): "${PY_PID:1}
+echo "[*] PID Python3 ($(whoami)): "${PY_PID:1}
