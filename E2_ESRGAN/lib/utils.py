@@ -178,20 +178,30 @@ class RDB(tf.keras.layers.Layer):
 
   def __init__(self, out_features=32, bias=True):
     super(RDB, self).__init__()
-    self.conv = lambda x: tf.keras.layers.Conv2D(
+
+    _create_conv2d = partial(tf.keras.layers.Conv2D,
         out_features,
         kernel_size=[3, 3],
-        strides=[1, 1], padding="same", use_bias=bias)(x)
-    self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
-    self.beta = settings.Settings()["RDB"].get("residual_scale_beta", 0.2)
+        strides=[1, 1], padding="same", use_bias=bias)
+    self._conv2d_layers = {
+        "conv_1": _create_conv2d(),
+        "conv_2": _create_conv2d(),
+        "conv_3": _create_conv2d(),
+        "conv_4": _create_conv2d(),
+        "conv_5": _create_conv2d()}
+    self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
+    self._beta = settings.Settings()["RDB"].get("residual_scale_beta", 0.2)
 
   def call(self, input_):
-    x1 = self.lrelu(self.conv(input_))
-    x2 = self.lrelu(self.conv(tf.concat([input_, x1], -1)))
-    x3 = self.lrelu(self.conv(tf.concat([input_, x1, x2], -1)))
-    x4 = self.lrelu(self.conv(tf.concat([input_, x1, x2, x3], -1)))
-    x5 = self.conv(tf.concat([input_, x1, x2, x3, x4], -1))
-    return input_ + self.beta * x5
+    x1 = self._lrelu(self._conv2d_layers["conv_1"](input_))
+    x2 = self._lrelu(self._conv2d_layers["conv_2"](
+        tf.concat([input_, x1], -1)))
+    x3 = self._lrelu(self._conv2d_layers["conv_3"](
+        tf.concat([input_, x1, x2], -1)))
+    x4 = self._lrelu(self._conv2d_layers["conv_4"](
+        tf.concat([input_, x1, x2, x3], -1)))
+    x5 = self._conv2d_layers["conv_5"](tf.concat([input_, x1, x2, x3, x4], -1))
+    return input_ + self._beta * x5
 
 
 class RRDB(tf.keras.layers.Layer):
