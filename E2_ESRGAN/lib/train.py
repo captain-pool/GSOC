@@ -163,7 +163,7 @@ class Trainer(object):
         weights="imagenet",
         input_shape=[
             self.settings["dataset"]["hr_dimension"],
-            self.settings["dataset"]["hr_dimension"]])
+            self.settings["dataset"]["hr_dimension"], 3])
     ra_gen = utils.RelativisticAverageLoss(discriminator, type_="G")
     ra_disc = utils.RelativisticAverageLoss(discriminator, type_="D")
 
@@ -179,7 +179,7 @@ class Trainer(object):
           G=generator,
           G_optimizer=G_optimizer,
           summary_step=tf.summary.experimental.get_step())
-      status = utils.load_checkpoint(hot_start, "train_psnr")
+      status = utils.load_checkpoint(hot_start, "phase_1")
       # consuming variable from checkpoint
       tf.summary.experimental.get_step()
 
@@ -191,7 +191,7 @@ class Trainer(object):
           D=discriminator,
           D_optimizer=D_optimizer,
           summary_step=tf.summary.experimental.get_step())
-      status = utils.load_checkpoint(checkpoint, "train_combined")
+      status = utils.load_checkpoint(checkpoint, "phase_2")
 
     logging.debug("phase status object: {}".format(status))
 
