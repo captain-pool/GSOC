@@ -59,12 +59,10 @@ def interpolate_generator(
 
   optimizer = partial(tf.optimizers.Adam)
   gan_generator = generator_fn()
-  # building generator
+  psnr_generator = generator_fn()
+  # building generators
   gan_generator(tf.random.normal(
       [1, dimension // factor, dimension // factor, 3]))
-
-  psnr_generator = generator_fn()
-  # building generator
   psnr_generator(tf.random.normal(
       [1, dimension // factor, dimension // factor, 3]))
 
@@ -78,6 +76,12 @@ def interpolate_generator(
   load_checkpoint(phase_1_ckpt, "phase_1")
   load_checkpoint(phase_2_ckpt, "phase_2")
 
+  # Consuming Checkpoint
+  gan_generator(tf.random.normal(
+      [1, dimension // factor, dimension // factor, 3]))
+  psnr_generator(tf.random.normal(
+      [1, dimension // factor, dimension // factor, 3]))
+
   for variables_1, variables_2 in zip(
           gan_generator.trainable_variables, psnr_generator.trainable_variables):
     variables_1.assign((1 - alpha) * variables_2 + alpha * variables_1)
@@ -85,13 +89,14 @@ def interpolate_generator(
   return gan_generator
 
 
-def PerceptualLoss(**kwargs):
+def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
   """ Perceptual Loss using VGG19
       Args:
         weights: Weights to be loaded.
         input_shape: Shape of input image.
   """
-  vgg_model = tf.keras.applications.VGG19(**kwargs, include_top=False)
+  vgg_model = tf.keras.applications.VGG19(
+      input_shape=input_shape, weights=weights, include_top=False)
   for layer in vgg_model.layers:
     layer.trainable = False
   phi = tf.keras.Model(
@@ -100,12 +105,21 @@ def PerceptualLoss(**kwargs):
           vgg_model.get_layer("block5_conv4").output])
 
   def loss(y_true, y_pred):
-    return tf.compat.v1.losses.absolute_difference(
-        phi(y_true), phi(y_pred), reduction="weighted_mean")
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+    if loss_type.lower() == "l1":
+      return tf.reduce_mean(tf.abs(y_true - y_pred))
+    if loss_type.lower() == "l2":
+      return tf.keras.losses.MSE(phi(y_true), phi(y_pred))
+    raise ValueError(
+        "Loss Function: \"%s\" not defined for Perceptual Loss" %
+        loss_type)
   return loss
 
 
 def pixel_loss(y_true, y_pred):
+  y_true = tf.cast(y_true, tf.float32)
+  y_pred = tf.cast(y_pred, tf.float32)
   return tf.reduce_mean(tf.abs(y_true - y_pred))
 
 

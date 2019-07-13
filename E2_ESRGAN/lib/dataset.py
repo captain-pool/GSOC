@@ -3,8 +3,18 @@ from functools import partial
 import tensorflow as tf
 import tensorflow_datasets as tfds
 
+""" Dataset Handlers for ESRGAN """
+
 
 def scale_down(method="bicubic", dimension=256, factor=4):
+  """ Scales down function based on the parameters provided.
+      Args:
+        method (default: bicubic): Interpolation method to be used for Scaling down the image.
+        dimension (default: 256): Dimension of the high resolution counterpart.
+        factor (default: 4): Factor by which the model enhances the low resolution image.
+      Returns:
+        tf.data.Dataset mappable python function based on the configuration.
+  """
   def scale_fn(image, *args, **kwargs):
     high_resolution = image
     if not kwargs.get("no_random_crop", None):
@@ -27,7 +37,17 @@ def augment_image(
         brightness_delta=0.05,
         contrast_factor=[0.7, 1.3],
         saturation=[0.6, 1.6]):
-  """ helper function used for augmentation of images in the dataset. """
+  """ Helper function used for augmentation of images in the dataset.
+      Args:
+        low_res_map_fn: Dataset mappable scaling function being used in the context.
+        brightness_delta: maximum value for randomly assigning brightness of the image.
+        contrast_factor: list / tuple of minimum and maximum value of factor to set random contrast.
+                          None, if not to be used.
+        saturation: list / tuple of minimum and maximum value of factor to set random saturation.
+                    None, if not to be used.
+      Returns:
+        tf.data.Dataset mappable function for image augmentation
+  """
   def augment_fn(low_resolution, high_resolution, *args, **kwargs):
     # Augmenting data (~ 80%)
     def augment_steps_fn(low_resolution, high_resolution):
@@ -86,6 +106,12 @@ def augment_image(
 def reform_dataset(dataset, dimension, types):
   """ Helper function to convert the output_dtype of the dataset
       from (tf.float32, tf.uint8) to desired dtype
+      Args:
+        dataset: Source dataset(image-label dataset) to convert.
+        dimension: Dimension threshold of accepted image.
+        types: tuple / list of target datatype.
+      Returns:
+        tf.data.Dataset with the images of dimension >= Args.dimension and types = Args.types
   """
   def generator_fn():
     for data in dataset:
@@ -106,7 +132,31 @@ def load_dataset_directory(
         augment=True,
         cache_dir="cache/",
         buffer_size=3 * 32):
+  """ Loads image_label dataset from a local directory:
+      Structure of the local directory should be:
 
+      dataset_name
+      |__ label1
+      |   |__ image1
+      |   |__ image2
+      |
+      |__ label2
+          |__ image1
+          |__ image2
+
+      Args:
+          name: Name of the dataset.
+          directory: Location where the manual directory is located
+          low_res_map_fn: tf.data.Dataset mappable function to generate
+                          (low_resolution, high_resolution) pair
+          batch_size: Size of batch to create
+          shuffle: Boolean to indicate if data is to be shuffled.
+          augment: Boolean to indicate if data is to augmented.
+          cache_dir: Cache directory to save the data to.
+          buffer_size: size of shuffle buffer to use.
+      Returns:
+          A tf.data.Dataset having data as (low_resolution, high_resoltion)
+  """
   if not tf.io.gfile.exists(cache_dir):
     tf.io.gfile.mkdir(cache_dir)
   dl_config = tfds.download.DownloadConfig(manual_dir=directory)
@@ -148,7 +198,22 @@ def load_dataset(
         buffer_size=3 * 32,
         cache_dir="cache/",
         data_dir=None):
+  """ Helper function to load a dataset from tensorflow_datasets
+      Args:
+          name: Name of the dataset builder from tensorflow_datasets to load the data.
+          low_res_map_fn: tf.data.Dataset mappable function to generate
+                          (low_resolution, high_resolution) pair.
+          split: split of the dataset to return.
+          batch_size: Size of batch to create
+          shuffle: Boolean to indicate if data is to be shuffled.
+          augment: Boolean to indicate if data is to augmented.
+          buffer_size: size of shuffle buffer to use.
+          cache_dir: Cache directory to save the data to.
+          data_dir: Directory to save the downloaded dataset to.
+      Returns:
+          A tf.data.Dataset having data as (low_resolution, high_resoltion)
 
+  """
   if not tf.io.gfile.exists(cache_dir):
     tf.io.gfile.mkdir(cache_dir)
   dataset = reform_dataset(

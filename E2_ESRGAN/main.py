@@ -45,8 +45,20 @@ def main(**kwargs):
   Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
   summary_writer = tf.summary.create_file_writer(kwargs["log_dir"])
   profiler.start_profiler_server(6009)
-  generator = model.RRDBNet(out_channel=3)
-  discriminator = model.VGGArch()
+
+  def build_model_fn():
+    generator = model.RRDBNet(out_channel=3)
+    discriminator = model.VGGArch()
+    return generator, discriminator
+
+  generator, discriminator = None, None
+
+  if tf.test.is_gpu_available():
+    with tf.device("/gpu:0"):
+      generator, discriminator = build_model_fn()
+  else:
+    generator, discriminator = build_model_fn()
+
   training = train.Trainer(
       summary_writer=summary_writer,
       settings=sett,
@@ -60,6 +72,11 @@ def main(**kwargs):
     Stats["train_step_1"] = True
   if not Stats["train_step_2"] and "phase2" in phases:
     logging.info("starting phase 2")
+
+    if len(tf.config.experimental.list_physical_devices("GPU")) < 2:
+      logging.fatal(
+          "Phase 2 needs minimum of 2 GPUs to perform the training. Exiting Now")
+
     training.train_gan(generator, discriminator)
     Stats["train_step_2"] = True
 

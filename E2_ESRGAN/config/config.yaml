@@ -27,6 +27,7 @@ train_psnr:
     beta_1: 0.9
     beta_2: 0.999
 train_combined:
+  perceptual_loss_type: "L1" # Can be either L1 or L2
   lambda: 0.005
   eta: 0.01
   adam:
