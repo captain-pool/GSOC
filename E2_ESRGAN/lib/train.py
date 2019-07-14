@@ -152,7 +152,7 @@ class Trainer(object):
     lambda_ = phase_args["lambda"]
     hr_dimension = self.settings["dataset"]["hr_dimension"]
     eta = phase_args["eta"]
-    tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
+    tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int32))
     optimizer = partial(
         tf.optimizers.Adam,
         learning_rate=phase_args["adam"]["initial_lr"],
@@ -181,7 +181,7 @@ class Trainer(object):
       # consuming variable from checkpoint
       tf.summary.experimental.get_step()
 
-      tf.summary.experimental.set_step(tf.Variable(1, tf.int64))
+      tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int32))
     else:
       checkpoint = tf.train.Checkpoint(
           G=generator,
