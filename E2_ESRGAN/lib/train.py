@@ -169,6 +169,13 @@ class Trainer(object):
     # is used to initialize or "hot start" the generator
     # for phase #2 of training
     status = None
+    checkpoint = tf.train.Checkpoint(
+      G=generator,
+      G_optimizer=G_optimizer,
+      D=discriminator,
+      D_optimizer=D_optimizer,
+      summary_step=tf.summary.experimental.get_step())
+
     if not tf.io.gfile.exists(
         os.path.join(
             self.settings["checkpoint_path"]["phase_2"],
@@ -183,12 +190,6 @@ class Trainer(object):
 
       tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     else:
-      checkpoint = tf.train.Checkpoint(
-          G=generator,
-          G_optimizer=G_optimizer,
-          D=discriminator,
-          D_optimizer=D_optimizer,
-          summary_step=tf.summary.experimental.get_step())
       status = utils.load_checkpoint(checkpoint, "phase_2")
 
     logging.debug("phase status object: {}".format(status))
@@ -201,7 +202,7 @@ class Trainer(object):
         weights="imagenet",
         input_shape=[hr_dimension, hr_dimension, 3],
         loss_type=phase_args["perceptual_loss_type"])
-    tf.summary.experimental.set_step(tf.cast(tf.summary.experimental.get_step(), tf.int32))
+    #tf.summary.experimental.set_step(tf.cast(tf.summary.experimental.get_step(), tf.int32))
     for epoch in range(self.iterations):
       # Resetting Metrics
       gen_metric.reset_states()
@@ -275,5 +276,5 @@ class Trainer(object):
                   gen_metric.result().numpy(),
                   disc_metric.result().numpy(), psnr.numpy(),
                   time.time() - start))
-          utils.save_checkpoint(checkpoint, "train_combined")
+          utils.save_checkpoint(checkpoint, "phase_2")
           start = time.time()
