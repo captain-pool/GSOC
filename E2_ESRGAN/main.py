@@ -41,14 +41,15 @@ def main(**kwargs):
         manual: boolean to denote if data_dir is a manual directory.
         model_dir: directory to store the model into.
   """
-  
-  for physical_device in tf.config.experimental.list_physical_devices("GPU")
+
+  for physical_device in tf.config.experimental.list_physical_devices("GPU"):
     tf.config.experimental.set_memory_growth(physical_device, True)
-  
+
   sett = settings.Settings(kwargs["config"])
   Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
   summary_writer = tf.summary.create_file_writer(kwargs["log_dir"])
   profiler.start_profiler_server(6009)
+
   def build_model_fn():
     generator = model.RRDBNet(out_channel=3)
     discriminator = model.VGGArch()
