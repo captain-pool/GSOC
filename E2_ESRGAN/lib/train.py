@@ -152,7 +152,7 @@ class Trainer(object):
     lambda_ = phase_args["lambda"]
     hr_dimension = self.settings["dataset"]["hr_dimension"]
     eta = phase_args["eta"]
-    tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int32))
+    tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     optimizer = partial(
         tf.optimizers.Adam,
         learning_rate=phase_args["adam"]["initial_lr"],
@@ -181,7 +181,7 @@ class Trainer(object):
       # consuming variable from checkpoint
       tf.summary.experimental.get_step()
 
-      tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int32))
+      tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     else:
       checkpoint = tf.train.Checkpoint(
           G=generator,
@@ -201,6 +201,7 @@ class Trainer(object):
         weights="imagenet",
         input_shape=[hr_dimension, hr_dimension, 3],
         loss_type=phase_args["perceptual_loss_type"])
+    tf.summary.experimental.set_step(tf.cast(tf.summary.experimental.get_step(), tf.int32))
     for epoch in range(self.iterations):
       # Resetting Metrics
       gen_metric.reset_states()
