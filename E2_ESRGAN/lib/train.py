@@ -254,9 +254,9 @@ class Trainer(object):
         # Writing Summary
         with self.summary_writer.as_default():
           tf.summary.scalar(
-              "gen_loss", gen_metric, step=step)
+              "gen_loss", gen_metric.result(), step=step)
           tf.summary.scalar(
-              "disc_loss", disc_metric, step=step)
+              "disc_loss", disc_metric.result(), step=step)
           tf.summary.scalar("mean_psnr", psnr, step=step)
           step.assign_add(1)
 
