@@ -41,23 +41,26 @@ def main(**kwargs):
         manual: boolean to denote if data_dir is a manual directory.
         model_dir: directory to store the model into.
   """
+  
+  for physical_device in tf.config.experimental.list_physical_devices("GPU")
+    tf.config.experimental.set_memory_growth(physical_device, True)
+  
   sett = settings.Settings(kwargs["config"])
   Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
   summary_writer = tf.summary.create_file_writer(kwargs["log_dir"])
   profiler.start_profiler_server(6009)
-
   def build_model_fn():
     generator = model.RRDBNet(out_channel=3)
     discriminator = model.VGGArch()
     return generator, discriminator
 
-  generator, discriminator = None, None
+#  generator, discriminator = None, None
 
-  if tf.test.is_gpu_available():
-    with tf.device("/gpu:0"):
-      generator, discriminator = build_model_fn()
-  else:
-    generator, discriminator = build_model_fn()
+#  if tf.test.is_gpu_available():
+#    with tf.device("/gpu:0"):
+#      generator, discriminator = build_model_fn()
+#  else:
+  generator, discriminator = build_model_fn()
 
   training = train.Trainer(
       summary_writer=summary_writer,
@@ -73,9 +76,9 @@ def main(**kwargs):
   if not Stats["train_step_2"] and "phase2" in phases:
     logging.info("starting phase 2")
 
-    if len(tf.config.experimental.list_physical_devices("GPU")) < 2:
-      logging.fatal(
-          "Phase 2 needs minimum of 2 GPUs to perform the training. Exiting Now")
+#    if len(tf.config.experimental.list_physical_devices("GPU")) < 2:
+#      logging.fatal(
+#          "Phase 2 needs minimum of 2 GPUs to perform the training. Exiting Now")
 
     training.train_gan(generator, discriminator)
     Stats["train_step_2"] = True

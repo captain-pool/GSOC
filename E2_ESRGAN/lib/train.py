@@ -196,83 +196,83 @@ class Trainer(object):
     gen_metric = tf.keras.metrics.Mean()
     disc_metric = tf.keras.metrics.Mean()
     psnr_metric = tf.keras.metrics.Mean()
-    with tf.device("/gpu:1"):
-      perceptual_loss = utils.PerceptualLoss(
-          weights="imagenet",
-          input_shape=[hr_dimension, hr_dimension, 3],
-          loss_type=phase_args["perceptual_loss_type"])
-      for epoch in range(self.iterations):
-        # Resetting Metrics
-        gen_metric.reset_states()
-        disc_metric.reset_states()
-        psnr_metric.reset_states()
-        start = time.time()
-        for (image_lr, image_hr) in self.dataset:
-          step = tf.summary.experimental.get_step()
+    # with tf.device("/gpu:1"):
+    perceptual_loss = utils.PerceptualLoss(
+        weights="imagenet",
+        input_shape=[hr_dimension, hr_dimension, 3],
+        loss_type=phase_args["perceptual_loss_type"])
+    for epoch in range(self.iterations):
+      # Resetting Metrics
+      gen_metric.reset_states()
+      disc_metric.reset_states()
+      psnr_metric.reset_states()
+      start = time.time()
+      for (image_lr, image_hr) in self.dataset:
+        step = tf.summary.experimental.get_step()
 
-         # Calculating Loss applying gradients
-          with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-            fake = generator(image_lr)
-            percep_loss = perceptual_loss(image_hr, fake)
-            l1_loss = utils.pixel_loss(image_hr, fake)
-            loss_RaG = ra_gen(image_hr, fake)
-            disc_loss = ra_disc(image_hr, fake)
-            gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
-            disc_metric(disc_loss)
-            gen_metric(gen_loss)
-          psnr = psnr_metric(
-              tf.reduce_mean(
-                  tf.image.psnr(
-                      fake,
-                      image_hr,
-                      max_val=256.0)))
-          disc_grad = disc_tape.gradient(
-              disc_loss, discriminator.trainable_variables)
-          gen_grad = gen_tape.gradient(
-              gen_loss, generator.trainable_variables)
-          D_optimizer.apply_gradients(
-              zip(disc_grad, discriminator.trainable_variables))
-          G_optimizer.apply_gradients(
-              zip(gen_grad, generator.trainable_variables))
+       # Calculating Loss applying gradients
+        with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
+          fake = generator(image_lr)
+          percep_loss = perceptual_loss(image_hr, fake)
+          l1_loss = utils.pixel_loss(image_hr, fake)
+          loss_RaG = ra_gen(image_hr, fake)
+          disc_loss = ra_disc(image_hr, fake)
+          gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
+          disc_metric(disc_loss)
+          gen_metric(gen_loss)
+        psnr = psnr_metric(
+            tf.reduce_mean(
+                tf.image.psnr(
+                    fake,
+                    image_hr,
+                    max_val=256.0)))
+        disc_grad = disc_tape.gradient(
+            disc_loss, discriminator.trainable_variables)
+        gen_grad = gen_tape.gradient(
+            gen_loss, generator.trainable_variables)
+        D_optimizer.apply_gradients(
+            zip(disc_grad, discriminator.trainable_variables))
+        G_optimizer.apply_gradients(
+            zip(gen_grad, generator.trainable_variables))
 
-          if status:
-            status.assert_consumed()
-            logging.info("consumed checkpoint successfully!")
-            status = None
+        if status:
+          status.assert_consumed()
+          logging.info("consumed checkpoint successfully!")
+          status = None
 
-          # Decaying Learning Rate
-          for _step in decay_steps.copy():
-            if (step - 1) >= _step:
-              decay_steps.pop()
-              logging.debug(
-                  "[Phase 2] Decayed Learing Rate by %f." % decay_factor)
-              G_optimizer.learning_rate.assign(
-                  G_optimizer.learning_rate * decay_factor)
-              D_optimizer.learning_rate.assign(
-                  D_optimizer.learning_rate * decay_factor)
+        # Decaying Learning Rate
+        for _step in decay_steps.copy():
+          if (step - 1) >= _step:
+            decay_steps.pop()
+            logging.debug(
+                "[Phase 2] Decayed Learing Rate by %f." % decay_factor)
+            G_optimizer.learning_rate.assign(
+                G_optimizer.learning_rate * decay_factor)
+            D_optimizer.learning_rate.assign(
+                D_optimizer.learning_rate * decay_factor)
 
-          # Writing Summary
+        # Writing Summary
+        with self.summary_writer.as_default():
+          tf.summary.scalar(
+              "gen_loss", gen_metric, step=step)
+          tf.summary.scalar(
+              "disc_loss", disc_metric, step=step)
+          tf.summary.scalar("mean_psnr", psnr, step=step)
+          step.assign_add(1)
+
+        # Logging and Checkpointing
+        if not step % self.settings["print_step"]:
           with self.summary_writer.as_default():
-            tf.summary.scalar(
-                "gen_loss", gen_metric, step=step)
-            tf.summary.scalar(
-                "disc_loss", disc_metric, step=step)
-            tf.summary.scalar("mean_psnr", psnr, step=step)
-            step.assign_add(1)
-
-          # Logging and Checkpointing
-          if not step % self.settings["print_step"]:
-            with self.summary_writer.as_default():
-              tf.summary.image("fake_image", tf.cast(tf.clip_by_value(
-                  fake[:1], 0, 255), tf.uint8), step=step)
-              tf.summary.image("hr_image",
-                               tf.cast(image_hr[:1], tf.uint8),
-                               step=step)
-            logging.info(
-                "Epoch: {}\tBatch: {}\tGen Loss: {}\tDisc Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
-                    (epoch + 1), step.numpy() // (epoch + 1),
-                    gen_metric.result().numpy(),
-                    disc_metric.result().numpy(), psnr.numpy(),
-                    time.time() - start))
-            utils.save_checkpoint(checkpoint, "train_combined")
-            start = time.time()
+            tf.summary.image("fake_image", tf.cast(tf.clip_by_value(
+                fake[:1], 0, 255), tf.uint8), step=step)
+            tf.summary.image("hr_image",
+                             tf.cast(image_hr[:1], tf.uint8),
+                             step=step)
+          logging.info(
+              "Epoch: {}\tBatch: {}\tGen Loss: {}\tDisc Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
+                  (epoch + 1), step.numpy() // (epoch + 1),
+                  gen_metric.result().numpy(),
+                  disc_metric.result().numpy(), psnr.numpy(),
+                  time.time() - start))
+          utils.save_checkpoint(checkpoint, "train_combined")
+          start = time.time()
