@@ -49,10 +49,10 @@ class RRDBNet(tf.keras.Model):
 
     self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
 
-#  @tf.function(
-#      input_signature=[
-#          tf.TensorSpec(shape=[None, None, None, 3],
-#                        dtype=tf.float32)])
+  @tf.function(
+      input_signature=[
+          tf.TensorSpec(shape=[None, None, None, 3],
+                        dtype=tf.float32)])
   def call(self, input_):
     feature = self.conv_first(input_)
     trunk = self.conv_trunk(self.rdb_trunk(feature))
