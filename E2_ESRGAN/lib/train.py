@@ -170,11 +170,11 @@ class Trainer(object):
     # for phase #2 of training
     status = None
     checkpoint = tf.train.Checkpoint(
-      G=generator,
-      G_optimizer=G_optimizer,
-      D=discriminator,
-      D_optimizer=D_optimizer,
-      summary_step=tf.summary.experimental.get_step())
+        G=generator,
+        G_optimizer=G_optimizer,
+        D=discriminator,
+        D_optimizer=D_optimizer,
+        summary_step=tf.summary.experimental.get_step())
 
     if not tf.io.gfile.exists(
         os.path.join(
@@ -197,12 +197,10 @@ class Trainer(object):
     gen_metric = tf.keras.metrics.Mean()
     disc_metric = tf.keras.metrics.Mean()
     psnr_metric = tf.keras.metrics.Mean()
-    # with tf.device("/gpu:1"):
     perceptual_loss = utils.PerceptualLoss(
         weights="imagenet",
         input_shape=[hr_dimension, hr_dimension, 3],
         loss_type=phase_args["perceptual_loss_type"])
-    #tf.summary.experimental.set_step(tf.cast(tf.summary.experimental.get_step(), tf.int32))
     for epoch in range(self.iterations):
       # Resetting Metrics
       gen_metric.reset_states()
@@ -265,6 +263,11 @@ class Trainer(object):
         # Logging and Checkpointing
         if not step % self.settings["print_step"]:
           with self.summary_writer.as_default():
+            resized_lr = tf.image.resize(
+                tf.cast(tf.clip_by_value(image_lr[:1], 0, 255), tf.uint8),
+                [hr_dimension, hr_dimension],
+                method=self.settings["dataset"]["scale_method"])
+            tf.summary.image("lr_image", resized_lr, step=step)
             tf.summary.image("fake_image", tf.cast(tf.clip_by_value(
                 fake[:1], 0, 255), tf.uint8), step=step)
             tf.summary.image("hr_image",
