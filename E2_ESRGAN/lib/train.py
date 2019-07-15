@@ -102,7 +102,7 @@ class Trainer(object):
               "consumed checkpoint for phase_1 successfully")
           status = None
 
-        if step % decay_step:  # Decay Learning Rate
+        if not step % decay_step:  # Decay Learning Rate
           logging.debug(
               "Learning Rate: %f" %
               G_optimizer.learning_rate.numpy())
