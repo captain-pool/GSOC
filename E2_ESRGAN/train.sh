@@ -16,29 +16,31 @@ function wait_for_process() {
   return "$?"
 }
 function report_error(){
-[[ $1 -ne 0 ]] && printf "\r\033[K[X] Error occurred! Check $2" && exit 1 || rm $2
+[[ $1 -ne 0 ]] && printf "\r\033[K[X] Error occurred! $2" && exit 1 || rm -f $2
 }
 
 # Script Starts Here
 pushd $HOME
 
-python3 -c "import tensorflow_datasets" &>/dev/null
-
+python3 -c "import tensorflow_datasets" &>/dev/null &
+wait_for_process $! "Checking TFDS installation"
+printf "\n"
 if [[ $? -ne 0 ]]
 then
 	pip3 -q install -U tfds-nightly &> pip.log &
 	wait_for_process $! "Installing Tensorflow Datasets"
-	report_error $? "pip.log"
+	report_error $? "Check pip.log"
 	printf "\r\033[K[-] Installed Tensorflow Datasets\n"
 fi
 
-python3 -c "import tensorflow_hub" &>/dev/null
-
+python3 -c "import tensorflow_hub" &>/dev/null &
+wait_for_process $! "Checking TF-Hub Installation"
+printf "\n"
 if [[ $? -ne 0 ]]
 then
 	pip3 -q install -U tf-hub-nightly &> pip.log &
 	wait_for_process $! "Installing Tensorflow Hub"
-	report_error $? "pip.log"
+	report_error $? "Check pip.log"
 	printf "\r\033[K[-] Installed Tensorflow Hub\n"
 fi
 
@@ -60,12 +62,12 @@ then
   printf " [*] Downloading and Extracting Images from: $DATASET"
   gsutil -m rsync $DATASET $EXTRACTDIR &>download.log &
   wait_for_process $! "Downloading and Extracting Images from: $DATASET"
-  report_error $? "download.log"
+  report_error $? "Check download.log"
   printf "\r\033[K[-] Done Downloading and Extracting!\n" 
   
   python3 -c "$CODE" &>parse.log &
   wait_for_process $! "Parsing Dataset to TF Records."
-	report_error $? "parse.log"
+	report_error $? "Check parse.log"
   printf "\r\033[K[-] Done Parsing to TF Records\n"
 fi
 # Creating Log and  Model Dump Directories"
@@ -89,7 +91,7 @@ rm -rf cache/*.lockfile
 python3 main.py --data_dir $HOME/datadir \
 	--model_dir $HOME/modeldir \
 	--manual --log_dir $HOME/logdir \
-	--phases phase2 -vvv&>$HOME/logdir/main.log &
+	--phases phase1_phase2 -vvv&>$HOME/logdir/main.log &
 popd
 
 TB_PID=$(IFS=' ' pgrep -u root -f tensorboard)
