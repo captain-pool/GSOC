@@ -54,9 +54,8 @@ def interpolate_generator(
        Returns:
          Keras model of a generator with weights interpolated between the PSNR and GAN model.
   """
-  # TODO (@captain-pool): Fix bugs
   assert 0 <= alpha <= 1
-
+  logging.debug("Interpolating generator. Alpha: %f" % alpha)
   optimizer = partial(tf.optimizers.Adam)
   gan_generator = generator_fn()
   psnr_generator = generator_fn()
