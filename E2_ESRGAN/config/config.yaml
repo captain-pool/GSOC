@@ -1,6 +1,6 @@
 checkpoint_path:
-  phase_1: "checkpoints/phase_1"
-  phase_2: "checkpoints/phase_2"
+  phase_1: "gs://rickdey1998/checkpoints/phase_1"
+  phase_2: "gs://rickdey1998/checkpoints/phase_2"
 
 dataset: 
   name: "coco2014"
