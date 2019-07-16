@@ -70,7 +70,7 @@ def main(**kwargs):
     training.train_gan(generator, discriminator)
     Stats["train_step_2"] = True
 
-  elif Stats["train_step_1"]:
+  if Stats["train_step_1"] and Stats["train_step_2"]:
     # Attempting to save "Interpolated" Model as SavedModel2.0
     interpolated_generator = utils.interpolate_generator(
         partial(model.RRDBNet, out_channel=3),
