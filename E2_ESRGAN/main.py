@@ -49,7 +49,6 @@ def main(**kwargs):
   Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
   summary_writer = tf.summary.create_file_writer(kwargs["log_dir"])
   profiler.start_profiler_server(6009)
-
   generator = model.RRDBNet(out_channel=3)
   discriminator = model.VGGArch()
 
