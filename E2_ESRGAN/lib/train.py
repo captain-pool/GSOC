@@ -197,11 +197,10 @@ class Trainer(object):
     gen_metric = tf.keras.metrics.Mean()
     disc_metric = tf.keras.metrics.Mean()
     psnr_metric = tf.keras.metrics.Mean()
-    with tf.device("/cpu:0"):
-      perceptual_loss = utils.PerceptualLoss(
-          weights="imagenet",
-          input_shape=[hr_dimension, hr_dimension, 3],
-          loss_type=phase_args["perceptual_loss_type"])
+    perceptual_loss = utils.PerceptualLoss(
+        weights="imagenet",
+        input_shape=[hr_dimension, hr_dimension, 3],
+        loss_type=phase_args["perceptual_loss_type"])
     for epoch in range(self.iterations):
       # Resetting Metrics
       gen_metric.reset_states()
@@ -214,10 +213,7 @@ class Trainer(object):
        # Calculating Loss applying gradients
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
           fake = generator(image_lr)
-          percep_start = time.time()
           percep_loss = perceptual_loss(image_hr, fake)
-          if status: # For first run
-            logging.debug("Perceptual Loss Time %d" time.time() - percep_start)
           l1_loss = utils.pixel_loss(image_hr, fake)
           loss_RaG = ra_gen(image_hr, fake)
           disc_loss = ra_disc(image_hr, fake)
