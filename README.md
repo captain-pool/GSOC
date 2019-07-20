@@ -1,6 +1,9 @@
 # GSOC
 Repository for Google Summer of Code 2019
 ---------------------------------------------
+## Mentors:
+- Sachin Joglekar ([@srjoglekar246](https://github.com/srjoglekar246))
+- Vojtech Bardiovsky ([@vbardiovskyg](https://github.com/vbardiovskyg))
 
 |Evaluation|Task|Link|Done|
 |:-:|:-:|:-:|:-:|
