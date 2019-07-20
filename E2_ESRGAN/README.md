@@ -25,11 +25,9 @@ reconstruction.
 ## Results
 
 The model trained on COCO2014 dataset on reconstructing 64 x 64 image by a scaling factor 4, yielded the following images.
-Original Image
-![Origin Resolution](https://user-images.githubusercontent.com/13994201/61579693-23d85d80-ab26-11e9-8372-5cd3034742fc.jpg)
-Low Resolution (Bicubic Interpolation)
-![Low Resolution](https://user-images.githubusercontent.com/13994201/61579669-d0660f80-ab25-11e9-8932-5356b244b767.jpg)
-Reconstructed Super Resolution Image
-![Super Resolution](https://user-images.githubusercontent.com/13994201/61579668-d0660f80-ab25-11e9-80e2-2115e3f46f28.jpg)
+![ESRGAN_COCO](https://user-images.githubusercontent.com/13994201/61580047-05289580-ab2b-11e9-9672-86de0345ce23.png)
 
+**Currently the Model is being trained on Flick100k, results will be uploaded shortly**
+
+## Trained Weights
 *The model checkpoints and the SavedModel will be released soon.*
