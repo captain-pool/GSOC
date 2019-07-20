@@ -32,3 +32,14 @@ The model trained on COCO2014 dataset on reconstructing 64 x 64 image by a scali
 
 ## Trained Weights
 *The model checkpoints and the SavedModel will be released soon.*
+
+
+## Custom Training
+Curling and executing `train.sh` handles everything.
+
+To run, **Tensorflow 2.0 must be installed on the system.**
+
+```bash
+$ curl https://raw.githubusercontent.com/captain-pool/GSOC/master/E2_ESRGAN/train.sh | sudo bash
+```
+
