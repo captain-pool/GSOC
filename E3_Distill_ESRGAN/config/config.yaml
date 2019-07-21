@@ -1,1 +1,16 @@
 # Config File for Distillation
+
+student_network: "name1"
+student_networks_config:
+  name1:
+    param1: 1
+    param2: "two"
+    paramN: "N"
+  name2:
+    param1: 1
+    param2: "two"
+    paramN: "N"
+  name3:
+    param1: 1
+    param2: "two"
+    paramN: "N"
