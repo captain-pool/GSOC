@@ -85,7 +85,7 @@ then
     echo "Data Directory Doesn't Exist! Exiting..." && exit 1
   fi
 fi
-python3 -c "$CODE" &>parse.log &
+python3 -u -c "$CODE" &>parse.log &
 wait_for_process $! "Parsing Dataset to TF Records."
 report_error $? "parse.log"
 printf "\r\033[K[-] Done Parsing to TF Records\n"
@@ -108,7 +108,7 @@ pushd "$BASEDIR/GSOC/E2_ESRGAN"
 
 rm -f cache/*.lockfile
 
-python3 main.py --data_dir "$DATADIR" \
+python3 -u main.py --data_dir "$DATADIR" \
 	--model_dir "$BASEDIR/modeldir" \
 	--manual --log_dir "$BASEDIR/logdir" \
 	--phases $PHASES -vvv&>"$BASEDIR/logdir/main.log" &
