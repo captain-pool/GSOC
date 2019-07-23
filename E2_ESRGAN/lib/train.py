@@ -80,7 +80,7 @@ class Trainer(object):
     previous_loss = float("inf")
     start_time = time.time()
     # Training starts
-    for epoch in range(self.iterations):
+    for epoch in range(1, self.iterations + 1):
       metric.reset_states()
       psnr_metric.reset_states()
       for image_lr, image_hr in self.dataset:
@@ -209,7 +209,7 @@ class Trainer(object):
         weights="imagenet",
         input_shape=[hr_dimension, hr_dimension, 3],
         loss_type=phase_args["perceptual_loss_type"])
-    for epoch in range(self.iterations):
+    for epoch in range(1, self.iterations + 1):
       # Resetting Metrics
       gen_metric.reset_states()
       disc_metric.reset_states()
