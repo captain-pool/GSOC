@@ -55,6 +55,7 @@ def main(**kwargs):
   training = train.Trainer(
       summary_writer=summary_writer,
       settings=sett,
+      model_dir=kwargs["model_dir"],
       data_dir=kwargs["data_dir"],
       manual=kwargs["manual"])
   phases = list(map(lambda x: x.strip(),

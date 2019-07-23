@@ -7,7 +7,7 @@ from lib import settings
 """ Utility functions needed for training ESRGAN model. """
 
 
-def save_checkpoint(checkpoint, training_phase):
+def save_checkpoint(checkpoint, training_phase, basepath=""):
   """ Saves checkpoint.
       Args:
         checkpoint: tf.train.Checkpoint object
@@ -15,11 +15,13 @@ def save_checkpoint(checkpoint, training_phase):
                         can be one of the two "phase_1" or "phase_2"
   """
   dir_ = settings.Settings()["checkpoint_path"][training_phase]
+  if basepath:
+    dir_ = os.path.join(basepath, dir_)
   dir_ = os.path.join(dir_, os.path.basename(dir_))
   checkpoint.save(file_prefix=dir_)
 
 
-def load_checkpoint(checkpoint, training_phase):
+def load_checkpoint(checkpoint, training_phase, basepath=""):
   """ Saves checkpoint.
       Args:
         checkpoint: tf.train.Checkpoint object
@@ -29,6 +31,8 @@ def load_checkpoint(checkpoint, training_phase):
   """
   logging.info("Loading check point for: %s" % training_phase)
   dir_ = settings.Settings()["checkpoint_path"][training_phase]
+  if basepath:
+    dir_ = os.path.join(basepath, dir_)
   if tf.io.gfile.exists(os.path.join(dir_, "checkpoint")):
     logging.info("Found checkpoint at: %s" % dir_)
     status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
