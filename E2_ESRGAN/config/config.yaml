@@ -3,9 +3,9 @@ checkpoint_path:
   phase_2: "checkpoints/phase_2"
 
 dataset: 
-  name: "coco2014"
+  name: "flickr100k"
   scale_method: "bicubic"
-  hr_dimension: 256
+  hr_dimension: 512
 
 print_step: 100
 

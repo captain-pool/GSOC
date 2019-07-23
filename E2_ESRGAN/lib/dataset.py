@@ -173,8 +173,8 @@ def load_dataset_directory(
       (tf.float32, tf.float32))
   dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
              .batch(batch_size)
-             .prefetch(buffer_size)
-             .cache(cache_dir))
+             .prefetch(buffer_size))
+             #.cache(cache_dir))
 
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
