@@ -3,7 +3,7 @@ checkpoint_path:
   phase_2: "checkpoints/phase_2"
 
 dataset: 
-  name: "image_label_folder/dataset_name=flickr100k"
+  name: "flickr100k"
   scale_method: "bicubic"
   hr_dimension: 512
 
