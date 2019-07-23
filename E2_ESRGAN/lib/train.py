@@ -1,6 +1,5 @@
 import os
 import time
-import itertools
 from functools import partial
 from absl import logging
 import tensorflow as tf
