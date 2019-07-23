@@ -1,4 +1,9 @@
 # Config File for Distillation
+checkpoint_path: "checkpoints/"
+train:
+  iterations: 1
+  print_step: 100
+  checkpoint_step: 1000
 
 student_network: "name1"
 student_networks_config:
