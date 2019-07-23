@@ -8,26 +8,26 @@ import tensorflow as tf
 """
   Compressing GANs using Knowledge Distillation.
   Teacher GAN: ESRGAN (https://github.com/captain-pool/E2_ESRGAN)
-  
-	Citation:
-		@article{DBLP:journals/corr/abs-1902-00159,
-			author    = {Angeline Aguinaldo and
-									 Ping{-}Yeh Chiang and
-									 Alexander Gain and
-									 Ameya Patil and
-									 Kolten Pearson and
-									 Soheil Feizi},
-			title     = {Compressing GANs using Knowledge Distillation},
-			journal   = {CoRR},
-			volume    = {abs/1902.00159},
-			year      = {2019},
-			url       = {http://arxiv.org/abs/1902.00159},
-			archivePrefix = {arXiv},
-			eprint    = {1902.00159},
-			timestamp = {Tue, 21 May 2019 18:03:39 +0200},
-			biburl    = {https://dblp.org/rec/bib/journals/corr/abs-1902-00159},
-			bibsource = {dblp computer science bibliography, https://dblp.org}
-		}
+
+Citation:
+  @article{DBLP:journals/corr/abs-1902-00159,
+    author    = {Angeline Aguinaldo and
+    Ping{-}Yeh Chiang and
+    Alexander Gain and
+    Ameya Patil and
+    Kolten Pearson and
+    Soheil Feizi},
+    title     = {Compressing GANs using Knowledge Distillation},
+    journal   = {CoRR},
+    volume    = {abs/1902.00159},
+    year      = {2019},
+    url       = {http://arxiv.org/abs/1902.00159},
+    archivePrefix = {arXiv},
+    eprint    = {1902.00159},
+    timestamp = {Tue, 21 May 2019 18:03:39 +0200},
+    biburl    = {https://dblp.org/rec/bib/journals/corr/abs-1902-00159},
+    bibsource = {dblp computer science bibliography, https://dblp.org}
+  }
 """
 def main(**kwargs):
   student_settings = settings.Settings("../E2_ESRGAN/config.yaml", student=True)
