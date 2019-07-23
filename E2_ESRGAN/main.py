@@ -77,7 +77,7 @@ def main(**kwargs):
         discriminator,
         sett["interpolation_parameter"],
         sett["dataset"]["hr_dimension"])
-    tf.saved_model.save(interpolated_generator, os.path.join(kwargs["model_dir"], "esrgan")
+    tf.saved_model.save(interpolated_generator, os.path.join(kwargs["model_dir"], "esrgan"))
 
 
 if __name__ == '__main__':
