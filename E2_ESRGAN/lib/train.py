@@ -10,7 +10,13 @@ from lib import utils, dataset
 class Trainer(object):
   """ Trainer class for ESRGAN """
 
-  def __init__(self, summary_writer, settings, model_dir="", data_dir=None, manual=False):
+  def __init__(
+          self,
+          summary_writer,
+          settings,
+          model_dir="",
+          data_dir=None,
+          manual=False):
     """ Setup the values and variables for Training.
         Args:
           summary_writer: tf.summary.SummaryWriter object to write summaries for Tensorboard.
@@ -179,8 +185,10 @@ class Trainer(object):
 
     if not tf.io.gfile.exists(
         os.path.join(
+            self.model_dir,
+            os.path.join(
             self.settings["checkpoint_path"]["phase_2"],
-            "checkpoint")):
+            "checkpoint"))):
       hot_start = tf.train.Checkpoint(
           G=generator,
           G_optimizer=G_optimizer,
