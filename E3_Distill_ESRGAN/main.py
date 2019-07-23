@@ -1,9 +1,9 @@
 from absl import logging
 import argparse
-from lib.models import teacher
-from lib import model
-from lib import utils
-from lib import settings
+from libs.models import teacher
+from libs import model
+from libs import utils
+from libs import settings
 import tensorflow as tf
 """
   Compressing GANs using Knowledge Distillation.
