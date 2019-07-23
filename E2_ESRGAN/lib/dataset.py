@@ -160,7 +160,6 @@ def load_dataset_directory(
   if not tf.io.gfile.exists(cache_dir):
     tf.io.gfile.mkdir(cache_dir)
   dl_config = tfds.download.DownloadConfig(manual_dir=directory)
-  logging.info(low_res_map_fn.dimension)
   dataset = reform_dataset(
       tfds.load(
           "image_label_folder/dataset_name=%s" %
@@ -227,8 +226,8 @@ def load_dataset(
 
   dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
              .batch(batch_size)
-             .prefetch(buffer_size)
-             .cache(cache_dir))
+             .prefetch(buffer_size))
+             #.cache(cache_dir))
 
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
