@@ -27,14 +27,14 @@ class Settings(object):
 
   def get(self, index, default=None):
     with open(self.__path, "r") as file_:
-      return yaml.load(file_.read()).get(index, default)
+      return yaml.load(file_.read(), Loader=yaml.FullLoader).get(index, default)
 
 
 class Stats(object):
   def __init__(self, filename="stats.yaml"):
     if os.path.exists(filename):
       with open(filename, "r") as file_:
-        self.__data = yaml.load(file_.read())
+        self.__data = yaml.load(file_.read(), Loader=yaml.FullLoader)
     else:
       self.__data = {}
     self.file = filename
