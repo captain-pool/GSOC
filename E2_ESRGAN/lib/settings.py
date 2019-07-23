@@ -23,7 +23,7 @@ class Settings(object):
 
   def __getitem__(self, index):
     with open(self.__path, "r") as file_:
-      return yaml.load(file_.read())[index]
+      return yaml.load(file_.read(), Loader=yaml.FullLoader)[index]
 
   def get(self, index, default=None):
     with open(self.__path, "r") as file_:
