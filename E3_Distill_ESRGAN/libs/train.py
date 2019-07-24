@@ -1,3 +1,5 @@
+""" Trainer class to train student network to compress ESRGAN """
+
 from __future__ import absoulte_import
 from __future__ import division
 from __future__ import print_function

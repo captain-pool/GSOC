@@ -1,3 +1,4 @@
+""" Module Containing Settings and Training Statistics Model YAML Handler """
 import os
 import yaml
 
@@ -15,6 +16,7 @@ def singleton(cls):
 
 @singleton
 class Settings(object):
+  """ Settings class to handle yaml config files """
   def __init__(self, filename="config.yaml", student=False):
     self.__path = os.path.abspath(filename)
 
@@ -32,6 +34,7 @@ class Settings(object):
 
 
 class Stats(object):
+  """ Class to handle Training Statistics File """
   def __init__(self, filename="stats.yaml"):
     if os.path.exists(filename):
       with open(filename, "r") as file_:

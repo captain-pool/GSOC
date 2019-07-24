@@ -1,3 +1,4 @@
+""" Module containing utility functions for the trainer """
 import os
 import sys
 
@@ -14,6 +15,13 @@ from lib.utils import RelativisticAverageLoss
 
 
 def save_checkpoint(checkpoint, name, basepath="", student=False):
+  """ Saves Checkpoint
+      Args:
+        checkpoint: tf.train.Checkpoint object to save.
+        name: name of the checkpoint to save.
+        basepath: base directory where checkpoint should be saved
+        student: boolean to indicate if settings of the student should be used.
+  """
   sett = settings.Settings(student=student)
   dir_ = os.path.join(basepath, sett[name], checkpoint)
   logging.info("Saving checkpoint: %s Path: %s" % (name, dir_))
@@ -22,6 +30,14 @@ def save_checkpoint(checkpoint, name, basepath="", student=False):
 
 
 def load_checkpoint(checkpoint, name, basepath="", student=False):
+  """ Restores Checkpoint
+      Args:
+        checkpoint: tf.train.Checkpoint object to restore.
+        name: name of the checkpoint to restore.
+        basepath: base directory where checkpoint is located.
+        student: boolean to indicate if settings of the student should be used.
+  """
+
   sett = settings.Settings(student=student)
   dir_ = os.path.join(basepath, sett[name], "checkpoint")
   if tf.io.gfile.exists(dir_):

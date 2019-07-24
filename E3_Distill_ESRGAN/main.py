@@ -32,6 +32,14 @@ import tensorflow as tf
 
 
 def train_and_export(**kwargs):
+  """ Train and Export Compressed ESRGAN
+      Args:
+        config: path to config file.
+        logdir: path to logging directory
+        modeldir: Path to store the checkpoints and exported model.
+        datadir: Path to custom data directory.
+        manual: Boolean to indicate if `datadir` contains Raw Files(True) / TFRecords (False)
+  """
   student_settings = settings.Settings(kwargs["config"], student=True)
   teacher_settings = settings.Settings(
       student_settings["teacher_config"], student=False)
