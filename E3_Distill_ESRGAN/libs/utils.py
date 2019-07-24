@@ -1,11 +1,16 @@
+import os
+import sys
+
 from absl import logging
 from libs import settings
 import tensorflow as tf
-import os
 # Loading utilities from ESRGAN
-import sys
-sys.path.insert(0, os.path.abspath(".."))
-from E2_ESRGAN.lib.utils import RelativisticAverageLoss
+sys.path.insert(
+    0,
+    os.path.abspath(
+        settings.Settings(student=True)["teacher_directory"]))
+
+from lib.utils import RelativisticAverageLoss
 
 
 def save_checkpoint(checkpoint, name, basepath="", student=False):

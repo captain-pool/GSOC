@@ -1,11 +1,3 @@
-from absl import logging
-import argparse
-from libs.models import teacher
-from libs import model
-from libs import train
-from libs import settings
-from libs import utils
-import tensorflow as tf
 """
   Compressing GANs using Knowledge Distillation.
   Teacher GAN: ESRGAN (https://github.com/captain-pool/E2_ESRGAN)
@@ -30,14 +22,20 @@ Citation:
     bibsource = {dblp computer science bibliography, https://dblp.org}
   }
 """
+from absl import logging
+import argparse
+from libs.models import teacher
+from libs import model
+from libs import train
+from libs import settings
+import tensorflow as tf
 
 
-def main(**kwargs):
-
-  student_settings = settings.Settings(
-      "../E2_ESRGAN/config.yaml", student=True)
-  teacher_settings = settings.Settings("config/config.yaml", student=False)
-  stats = settings.Stats("config/yaml")
+def train_and_export(**kwargs):
+  student_settings = settings.Settings(kwargs["config"], student=True)
+  teacher_settings = settings.Settings(
+      student_settings["teacher_config"], student=False)
+  stats = settings.Stats(os.path.join(student_settings.path, "stats.yaml"))
   summary_writer = tf.summmary.create_file_writer(kwargs["logdir"])
 
   student_generator = model.Registry[student_settings["student_network"]]()
@@ -71,6 +69,10 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("--logdir", default=None, help="Path to log directory")
   parser.add_argument(
+      "--config",
+      default="config/config.yaml",
+      help="path to config file")
+  parser.add_argument(
       "--datadir",
       default=None,
       help="Path to custom data directory")
@@ -98,4 +100,4 @@ if __name__ == "__main__":
   log_levels = [logging.WARNING, logging.INFO, logging.DEBUG]
   log_level = log_levels[min(FLAGS.verbose, len(log_levels) - 1)]
   logging.set_verbosity(log_level)
-  main(**vars(FLAGS))
+  train_and_export(**vars(FLAGS))

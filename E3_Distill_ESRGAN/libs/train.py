@@ -12,15 +12,27 @@ import tensorflow as tf
 
 
 class Trainer(object):
+  """Trainer Class for Knowledge Distillation of ESRGAN"""
   def __init__(
-          self,
-          teacher,
-          discriminator,
-          summary_writer,
-          data_dir="",
-          manual=False,
-          model_dir=""):
-
+      self,
+      teacher,
+      discriminator,
+      summary_writer,
+      data_dir="",
+      manual=False,
+      model_dir=""):
+    """
+      Args:
+        teacher: Keras Model of pre-trained teacher generator.
+                 (Generator of ESRGAN)
+        discriminator: Keras Model of pre-trained teacher discriminator.
+                       (Discriminator of ESRGAN)
+        summary_writer: tf.summary.SummaryWriter object for writing
+                         summary for Tensorboard.
+        data_dir: Location of the stored dataset.
+        manual: Indicate if data_parameter contains Raw Files or TFRecords.
+        model_dir: Location to store checkpoints and SavedModel directory.
+    """
     self.teacher_generator = teacher
     self.teacher_discriminator = discriminator
     self.teacher_settings = settings.Settings(student=False)
@@ -57,7 +69,12 @@ class Trainer(object):
         student=False)
 
   def train_comparative(self, student):
-
+    """
+      Trains the student using a comparative loss function (Mean Squared Error)
+      based on the output of Teacher.
+      Args:
+        student: Keras model of the student.
+    """
     tf.summary.experimental.set_step(tf.Variable(0, tf.int64))
     optimizer = tf.optimizers.Adam()
     checkpoint = tf.train.Checkpoint(
@@ -65,20 +82,11 @@ class Trainer(object):
         optimizer=optimizer,
         summary_step=tf.summary.experimental.get_step())
     logging.info("Starting Training using Comparative Loss")
-    status = None
-    if tf.io.gfile.exists(
-        os.path.join(
-            self.model_dir,
-            self.student_settings["mse_checkpoint"],
-            "checkpoint")):
-      logging.info(
-          "Found checkpoint at: %s" %
-          self.student_settings["mse_checkpoint"])
-      status = utils.load_checkpoint(
-          checkpoint,
-          "mse_checkpoint",
-          base_path=self.model_dir,
-          student=True)
+    status = utils.load_checkpoint(
+        checkpoint,
+        "mse_checkpoint",
+        base_path=self.model_dir,
+        student=True)
     loss_fn = tf.keras.losses.MeanSquaredError()
     metric_fn = tf.keras.losses.Mean()
 
@@ -94,6 +102,10 @@ class Trainer(object):
           metric_fn(loss)
         gradient = tape.gradient(loss, student.trainable_variables)
         optimizer.apply_gradients(zip(gradient, student.trainable_variables))
+        if status:
+          status.assert_consumed()
+          logging.info("Checkpoint loaded successfully")
+          status = None
         # Writing Summary
         with self.summary_writer.as_default():
           tf.summary.scalar("loss", metric_fn.result(), step=step)
@@ -120,29 +132,28 @@ class Trainer(object):
         step.assign_add(1)
 
   def train_adversarial(self, student):
-    status = None
+    """
+      Train the student adversarially using a joint loss between teacher discriminator
+      and mean squared error between the output of the student-teacher generator pair.
+      Args:
+        student: Keras model of the student to train.
+    """
     checkpoint = tf.train.Checkpoint(
         student=student,
         teacher_generator=self.teacher_generator,
         teacher_discriminator=self.teacher_discriminator,
         summary_step=tf.summary.experimental.get_step())
-    if tf.io.gfile.exists(
-        os.path.join(
-            self.model_dir,
-            self.student_settings["adversarial_checkpoint"],
-            "checkpoint")):
-      logging.info("Found checkpoint at: %s" self.student_settings["adversarial_checkpoint"])
-      status = utils.load_checkpoint(
-          checkpoint,
-          "adversarial_checkpoint",
-          basepath=self.model_dir,
-          student=True)
+    status = utils.load_checkpoint(
+        checkpoint,
+        "adversarial_checkpoint",
+        basepath=self.model_dir,
+        student=True)
     if not tf.summary.experimental.get_step():
       tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
 
     ra_generator = utils.RelativisticAverageLoss(
         self.teacher_discriminator, type_="G")
-    ra_discriminiator = utils.RelativisticAverageLoss(
+    ra_discriminator = utils.RelativisticAverageLoss(
         self.teacher_discriminator, type_="D")
     alpha = self.training_args["balance_factor"]
     generator_optimizer = tf.optimizers.Adam()
@@ -203,7 +214,7 @@ class Trainer(object):
             tf.summary.image("high_res", tf.cast(
                 image_hr[:1], tf.uint8), step=step)
           logging.info(
-              "[ADVERSARIAL] Epoch: %d\tBatch: %\tStudent Loss: %f" %
+              "[ADVERSARIAL] Epoch: %d\tBatch: %d\tStudent Loss: %f" %
               (epoch, step // epoch, loss))
 
         # Setting Up Checkpoint
