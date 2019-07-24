@@ -7,7 +7,7 @@ train:
   checkpoint_step: 1000
   balance_factor: 0.2 # alpha of Adversarial Training
 student_network: "name1"
-student_networks_config:
+student_config:
   name1:
     param1: 1
     param2: "two"

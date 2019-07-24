@@ -1,21 +1,23 @@
-import os
-import sys
-sys.path.insert(0, os.path.abspath("../E2_ESRGAN"))
+from __future__ import absoulte_import
+from __future__ import division
+from __future__ import print_function
 
-import tensorflow as tf
-from libs import utils
-from libs import settings
-from lib import dataset
+import os
+
 from absl import logging
+from lib import dataset
+from libs import settings
+from libs import utils
+import tensorflow as tf
 
 
 class Trainer(object):
   def __init__(
           self,
-          data_dir,
           teacher,
           discriminator,
           summary_writer,
+          data_dir="",
           manual=False,
           model_dir=""):
 
@@ -43,6 +45,7 @@ class Trainer(object):
           batch_size=self.teacher_settings["batch_size"],
           data_dir=data_dir)
     self.summary_writer = summary_writer
+
     # Reloading Checkpoint from Phase 2 Training of ESRGAN
     checkpoint = tf.train.Checkpoint(
         G=self.teacher_generator,
@@ -53,7 +56,7 @@ class Trainer(object):
         basepath=model_dir,
         student=False)
 
-  def train_comparative_loss(self, student):
+  def train_comparative(self, student):
 
     tf.summary.experimental.set_step(tf.Variable(0, tf.int64))
     optimizer = tf.optimizers.Adam()
@@ -116,7 +119,7 @@ class Trainer(object):
               student=True)
         step.assign_add(1)
 
-  def train_adversarial_loss(self, student):
+  def train_adversarial(self, student):
     status = None
     checkpoint = tf.train.Checkpoint(
         student=student,
@@ -152,6 +155,7 @@ class Trainer(object):
       discriminator_metric.reset_states()
       for image_lr, image_hr in self.dataset:
         step = tf.summary.expermental.get_step()
+
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
           student_fake = student(image_lr)
           psnr = tf.image.psnr(student_fake, image_hr, maxval=255)
