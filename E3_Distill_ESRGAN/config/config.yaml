@@ -1,10 +1,11 @@
 # Config File for Distillation
-checkpoint_path: "checkpoints/"
+mse_checkpoint: "checkpoints/mse_checkpoints/"
+adversarial_checkpoint: "checkpoints/adversarial_checkpoints/"
 train:
   iterations: 1
   print_step: 100
   checkpoint_step: 1000
-
+  balance_factor: 0.2 # alpha of Adversarial Training
 student_network: "name1"
 student_networks_config:
   name1:
