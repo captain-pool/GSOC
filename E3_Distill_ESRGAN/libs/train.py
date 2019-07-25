@@ -21,8 +21,8 @@ class Trainer(object):
       discriminator,
       summary_writer,
       data_dir="",
-      manual=False,
-      model_dir=""):
+      model_dir="",
+      manual=False):
     """
       Args:
         teacher: Keras Model of pre-trained teacher generator.
@@ -32,13 +32,13 @@ class Trainer(object):
         summary_writer: tf.summary.SummaryWriter object for writing
                          summary for Tensorboard.
         data_dir: Location of the stored dataset.
-        manual: Indicate if data_parameter contains Raw Files or TFRecords.
+        manual: Indicate if data_dir contains Raw Data or TFRecords.
         model_dir: Location to store checkpoints and SavedModel directory.
     """
     self.teacher_generator = teacher
     self.teacher_discriminator = discriminator
-    self.teacher_settings = settings.Settings(student=False)
-    self.student_settings = settings.Settings(student=True)
+    self.teacher_settings = settings.Settings(use_student_settings=False)
+    self.student_settings = settings.Settings(use_student_settings=True)
     dataset_args = self.teacher_settings["dataset"]
     self.train_args = self.student_settings["train"]
 
@@ -68,7 +68,7 @@ class Trainer(object):
         checkpoint,
         "phase_2",
         basepath=model_dir,
-        student=False)
+        use_student_settings=False)
 
   def train_comparative(self, student):
     """
@@ -88,7 +88,7 @@ class Trainer(object):
         checkpoint,
         "mse_checkpoint",
         base_path=self.model_dir,
-        student=True)
+        use_student_settings=True)
     loss_fn = tf.keras.losses.MeanSquaredError()
     metric_fn = tf.keras.losses.Mean()
 
@@ -130,7 +130,7 @@ class Trainer(object):
               checkpoint,
               "mse_checkpoint",
               basepath=self.model_dir,
-              student=True)
+              use_student_settings=True)
         step.assign_add(1)
 
   def train_adversarial(self, student):
@@ -141,7 +141,7 @@ class Trainer(object):
         student: Keras model of the student to train.
     """
     checkpoint = tf.train.Checkpoint(
-        student=student,
+        student_generator=student,
         teacher_generator=self.teacher_generator,
         teacher_discriminator=self.teacher_discriminator,
         summary_step=tf.summary.experimental.get_step())
@@ -149,7 +149,7 @@ class Trainer(object):
         checkpoint,
         "adversarial_checkpoint",
         basepath=self.model_dir,
-        student=True)
+        use_student_settings=True)
     if not tf.summary.experimental.get_step():
       tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
 
@@ -225,6 +225,6 @@ class Trainer(object):
               checkpoint,
               "adversarial_checkpoint",
               basepath=self.modelpath,
-              student=True)
+              use_student_settings=True)
 
         step.assign_add(1)

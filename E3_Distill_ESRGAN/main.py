@@ -40,9 +40,9 @@ def train_and_export(**kwargs):
         datadir: Path to custom data directory.
         manual: Boolean to indicate if `datadir` contains Raw Files(True) / TFRecords (False)
   """
-  student_settings = settings.Settings(kwargs["config"], student=True)
+  student_settings = settings.Settings(kwargs["config"], use_student_settings=True)
   teacher_settings = settings.Settings(
-      student_settings["teacher_config"], student=False)
+      student_settings["teacher_config"], use_student_settings=False)
   stats = settings.Stats(os.path.join(student_settings.path, "stats.yaml"))
   summary_writer = tf.summmary.create_file_writer(kwargs["logdir"])
 

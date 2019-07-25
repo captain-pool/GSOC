@@ -1,11 +1,11 @@
-""" Module Containing Settings and Training Statistics Model YAML Handler """
+""" Module containing settings and training statistics file handler."""
 import os
 import yaml
 
 def singleton(cls):
   instances = {}
   def getinstance(*args, **kwargs):
-    distill_config = kwargs.get("student", "")
+    distill_config = kwargs.get("use_student_settings", "")
     key = cls.__name__
     if distill_config:
       key = "%s_student" % (cls.__name__)
@@ -17,7 +17,7 @@ def singleton(cls):
 @singleton
 class Settings(object):
   """ Settings class to handle yaml config files """
-  def __init__(self, filename="config.yaml", student=False):
+  def __init__(self, filename="config.yaml", use_student_settings=False):
     self.__path = os.path.abspath(filename)
 
   @property
