@@ -6,7 +6,7 @@ import tensorflow_datasets as tfds
 """ Dataset Handlers for ESRGAN """
 
 
-def scale_down(method="bicubic", dimension=256, size=None,factor=4):
+def scale_down(method="bicubic", dimension=256, size=None, factor=4):
   """ Scales down function based on the parameters provided.
       Args:
         method (default: bicubic): Interpolation method to be used for Scaling down the image.
@@ -21,7 +21,7 @@ def scale_down(method="bicubic", dimension=256, size=None,factor=4):
     if not kwargs.get("no_random_crop", None):
       if not size:
         size = (dimension, dimension)
-      
+
       high_resolution = tf.image.random_crop(
           image, [size[0], size[1], image.shape[-1]])
 

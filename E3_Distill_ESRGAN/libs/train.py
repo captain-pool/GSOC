@@ -15,6 +15,7 @@ import tensorflow as tf
 
 class Trainer(object):
   """Trainer Class for Knowledge Distillation of ESRGAN"""
+
   def __init__(
       self,
       teacher,
@@ -117,7 +118,7 @@ class Trainer(object):
         if self.summary_writer_2:
           with self.summary_writer_2.as_default():
             tf.summary.scalar("psnr", teacher_psnr, step=step)
- 
+
         if step % self.train_args["print_step"]:
           with self.summary_writer.as_default():
             tf.summary.image("low_res", tf.cast(
@@ -214,7 +215,7 @@ class Trainer(object):
         if self.summary_writer_2:
           with self.summary_writer_2.as_default():
             tf.summary.scalar("psnr", teacher_psnr, step=step)
-        
+
         if step % self.student_settings["print_step"]:
           with self.summary_writer.as_default():
             tf.summary.image("low_res", tf.cast(

@@ -4,6 +4,7 @@ from libs import settings
 from libs.models import abstract
 from functools import partial
 
+
 class VGGStudent01(abstract.Model):
   def init(self):
     sett = settings.Settings(student=True)
@@ -22,7 +23,7 @@ class VGGStudent01(abstract.Model):
   @tf.function(
       input_signature=[
           tf.TensorSpec(
-              shape=[None, 180, 270, 3], # For 720x1080 images
+              shape=[None, 180, 270, 3],  # For 720x1080 images
               dtype=tf.float32)])
   def call(self, inputs):
     intermediate = inputs
