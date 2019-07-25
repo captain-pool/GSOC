@@ -24,7 +24,7 @@ class Trainer(object):
       summary_writer_2=None,
       data_dir="",
       model_dir="",
-      manual=False):
+      raw_data=False):
     """
       Args:
         teacher: Keras Model of pre-trained teacher generator.
@@ -34,7 +34,7 @@ class Trainer(object):
         summary_writer: tf.summary.SummaryWriter object for writing
                          summary for Tensorboard.
         data_dir: Location of the stored dataset.
-        manual: Indicate if data_dir contains Raw Data or TFRecords.
+        raw_data: Indicate if data_dir contains Raw Data or TFRecords.
         model_dir: Location to store checkpoints and SavedModel directory.
     """
     self.teacher_generator = teacher
@@ -44,7 +44,7 @@ class Trainer(object):
     dataset_args = self.teacher_settings["dataset"]
     self.train_args = self.student_settings["train"]
 
-    if manual:
+    if raw_data:
       self.dataset = dataset.load_dataset_directory(
           dataset_args["name"],
           data_dir,

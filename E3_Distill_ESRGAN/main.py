@@ -58,7 +58,7 @@ def train_and_export(**kwargs):
       teacher_discriminator,
       summary_writer,
       data_dir=kwargs["datadir"],
-      manual=kwargs["manual"],
+      raw_data=kwargs["manual"],
       model_dir=kwargs["modeldir"]
       summary_writer_2=teacher_summary_writer)
 
