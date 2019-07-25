@@ -13,8 +13,9 @@ class ResidualDenseBlock(tf.keras.layers.Layer):
   """
 
   def __init__(self):
-    self.settings = settings.Settings(student=True)
-    rdb_config = self.settings["rrdb_student"]["rdb_config"]
+    super(ResidualDenseBlock, self).__init__()
+    self.settings = settings.Settings(use_student_settings=True)
+    rdb_config = self.settings["student_config"]["rrdb_student"]["rdb_config"]
     depthwise_convolution = partial(
         tf.keras.layers.DepthwiseConv2D,
         kernel_size=[3, 3],
@@ -23,7 +24,7 @@ class ResidualDenseBlock(tf.keras.layers.Layer):
     self._conv_layers = {
         "conv_%d" % index: depthwise_convolution()
         for index in range(1, rdb_config["depth"])}
-    self._lrelu = tf.keras.layers.leakyReLU(alpha=0.2)
+    self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self._beta = rdb_config["residual_scale_beta"]
 
   def call(self, inputs):
@@ -43,8 +44,9 @@ class ResidualInResidualBlock(tf.keras.layers.Layer):
   """
 
   def __init__(self):
-    self.settings = settings.Settings(student=True)
-    rrdb_config = self.settings["rrdb_student"]["rrdb_config"]
+    super(ResidualInResidualBlock, self).__init__()
+    self.settings = settings.Settings(use_student_settings=True)
+    rrdb_config = self.settings["student_config"]["rrdb_student"]["rrdb_config"]
     self._rdb_layers = {
         "rdb_%d" % index: ResidualDenseBlock()
         for index in range(1, rrdb_config["rdb_units"])}
@@ -64,8 +66,8 @@ class RRDBStudent(abstract.Model):
   """
 
   def init(self):
-    self.settings = settings.Settings(student=True)
-    rrdb_student_config = self.settings["rrdb_student"]
+    self.settings = settings.Settings(use_student_settings=True)
+    rrdb_student_config = self.settings["student_config"]["rrdb_student"]
     rrdb_block = partial(ResidualInResidualBlock)
     depthwise_convolution = partial(
         tf.keras.layers.DepthwiseConv2D,
@@ -87,17 +89,19 @@ class RRDBStudent(abstract.Model):
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
 
   @tf.function(
-      input_signature=[None, 180, 270, 3],    # 720x1080 Images
-      dtype=tf.float32)
+      input_signature=[
+          tf.TensorSpec(
+              shape=[None, 180, 270, 3],    # 720x1080 Images
+              dtype=tf.float32)])
   def call(self, inputs):
     residual_start = self.first_conv(inputs)
     intermediate = residual_start + self.rrdb_trunk(residual_start)
     intermediate = self._conv_pre_last(intermediate)
     intermediate = self._lrelu(
         self._upsample1(
-            tf.nn.depth_to_space(intermediate)))
+            tf.nn.depth_to_space(intermediate, 2)))
     intermediate = self._lrelu(
         self._upsample2(
-            tf.nn.depth_to_space(intermediate)))
+            tf.nn.depth_to_space(intermediate, 2)))
     out = self._conv_last(intermediate)
     return out
