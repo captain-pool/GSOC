@@ -20,6 +20,7 @@ class Trainer(object):
       teacher,
       discriminator,
       summary_writer,
+      summary_writer_2=None,
       data_dir="",
       model_dir="",
       manual=False):
@@ -48,18 +49,18 @@ class Trainer(object):
           data_dir,
           dataset.scale_down(
               method=dataset_args["scale_method"],
-              dimension=dataset_args["hr_dimension"]),
+              size=self.student_settings["hr_size"]),
           batch_size=self.teacher_settings["batch_size"])
     else:
       self.dataset = dataset.load_dataset(
           dataset_args["name"],
           dataset.scale_down(
               method=dataset_args["scale_args"],
-              dimension=dataset_args["hr_dimension"]),
+              size=self.student_settings["hr_size"]),
           batch_size=self.teacher_settings["batch_size"],
           data_dir=data_dir)
     self.summary_writer = summary_writer
-
+    self.summary_writer_2 = summary_writer_2
     # Reloading Checkpoint from Phase 2 Training of ESRGAN
     checkpoint = tf.train.Checkpoint(
         G=self.teacher_generator,
@@ -94,12 +95,13 @@ class Trainer(object):
 
     for epoch in range(1, self.train_args["iterations"] + 1):
       metric_fn.reset_states()
-      for image_lr, _ in self.dataset:
+      for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
         with tf.GradientTape() as tape:
           teacher_fake = self.teacher_generator(image_lr)
           student_fake = student(image_lr)
-          psnr = tf.image.psnr(teacher_fake, student_fake, maxval=255.0)
+          student_psnr = tf.image.psnr(image_hr, student_fake, maxval=255.0)
+          teacher_psnr = tf.image.psnr(image_hr, teacher_fake, maxval=255.0)
           loss = loss_fn(teacher_fake, student_fake)
           metric_fn(loss)
         gradient = tape.gradient(loss, student.trainable_variables)
@@ -111,7 +113,11 @@ class Trainer(object):
         # Writing Summary
         with self.summary_writer.as_default():
           tf.summary.scalar("loss", metric_fn.result(), step=step)
-          tf.summary.scalar("psnr", psnr, step=step)
+          tf.summary.scalar("psnr", student_psnr, step=step)
+        if self.summary_writer_2:
+          with self.summary_writer_2.as_default():
+            tf.summary.scalar("psnr", teacher_psnr, step=step)
+ 
         if step % self.train_args["print_step"]:
           with self.summary_writer.as_default():
             tf.summary.image("low_res", tf.cast(
@@ -171,8 +177,9 @@ class Trainer(object):
 
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
           student_fake = student(image_lr)
-          psnr = tf.image.psnr(student_fake, image_hr, maxval=255)
+          student_psnr = tf.image.psnr(image_hr, student_fake, maxval=255)
           teacher_fake = self.teacher_generator(image_lr)
+          teacher_psnr = tf.image.psnr(image_hr, teacher_fake, maxval=255)
           student_ra_loss = ra_generator(image_hr, student_fake)
           discriminator_loss = ra_discriminator(image_hr, student_fake)
           discriminator_metric(discriminator_loss)
@@ -203,8 +210,11 @@ class Trainer(object):
               "teacher_discriminator_loss",
               discriminator_metric.result(),
               step=step)
-          tf.summary.scalar("student_psnr", psnr, step=step)
-
+          tf.summary.scalar("psnr", student_psnr, step=step)
+        if self.summary_writer_2:
+          with self.summary_writer_2.as_default():
+            tf.summary.scalar("psnr", teacher_psnr, step=step)
+        
         if step % self.student_settings["print_step"]:
           with self.summary_writer.as_default():
             tf.summary.image("low_res", tf.cast(

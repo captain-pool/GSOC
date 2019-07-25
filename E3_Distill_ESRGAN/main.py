@@ -44,11 +44,11 @@ def train_and_export(**kwargs):
   teacher_settings = settings.Settings(
       student_settings["teacher_config"], use_student_settings=False)
   stats = settings.Stats(os.path.join(student_settings.path, "stats.yaml"))
-  summary_writer = tf.summmary.create_file_writer(kwargs["logdir"])
-
+  summary_writer = tf.summmary.create_file_writer(os.path.join(kwargs["logdir"], "student"))
   student_generator = model.Registry[student_settings["student_network"]]()
   teacher_generator = teacher.generator(out_channel=3)
   teacher_discriminator = teacher.discriminator()
+  teacher_summary_writer = tf.summary.create_file_writer(os.path.join(kwargs["logdir"], "teacher"))
 
   trainer = train.Trainer(
       teacher_generator,
@@ -56,7 +56,9 @@ def train_and_export(**kwargs):
       summary_writer,
       data_dir=kwargs["datadir"],
       manual=kwargs["manual"],
-      model_dir=kwargs["modeldir"])
+      model_dir=kwargs["modeldir"]
+      summary_writer_2 = teacher_summary_writer)
+
   if kwargs["type"].lower().startswith("comparative"):
     trainer.train_comparative(student_generator)
     stats["comparative"] = True

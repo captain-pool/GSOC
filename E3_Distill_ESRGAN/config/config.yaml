@@ -4,6 +4,7 @@ teacher_config: "../E2_ESRGAN/config/config.yaml"
 mse_checkpoint: "checkpoints/mse_checkpoints/"
 adversarial_checkpoint: "checkpoints/adversarial_checkpoints/"
 
+hr_size: [720, 1080]
 train:
   iterations: 1
   print_step: 100
@@ -15,10 +16,10 @@ student_network: "vgg_student01"
 student_config:
   vgg_student01:
     trunk_depth: 3 # Minimum 2
-    growth_channels: 32
+    # growth_channels: 32
     use_bias: True
-  name2:
-    param1: 1
+  residual_student01:
+    trunk_depth: 1
     param2: "two"
     paramN: "N"
   name3:

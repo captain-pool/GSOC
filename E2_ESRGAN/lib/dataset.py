@@ -6,11 +6,12 @@ import tensorflow_datasets as tfds
 """ Dataset Handlers for ESRGAN """
 
 
-def scale_down(method="bicubic", dimension=256, factor=4):
+def scale_down(method="bicubic", dimension=256, size=None,factor=4):
   """ Scales down function based on the parameters provided.
       Args:
         method (default: bicubic): Interpolation method to be used for Scaling down the image.
         dimension (default: 256): Dimension of the high resolution counterpart.
+        size (default: None): [height, width] of the image.
         factor (default: 4): Factor by which the model enhances the low resolution image.
       Returns:
         tf.data.Dataset mappable python function based on the configuration.
@@ -18,17 +19,20 @@ def scale_down(method="bicubic", dimension=256, factor=4):
   def scale_fn(image, *args, **kwargs):
     high_resolution = image
     if not kwargs.get("no_random_crop", None):
+      if not size:
+        size = (dimension, dimension)
+      
       high_resolution = tf.image.random_crop(
-          image, [dimension, dimension, image.shape[-1]])
+          image, [size[0], size[1], image.shape[-1]])
 
     low_resolution = tf.image.resize(
         high_resolution,
-        [dimension // factor, dimension // factor],
+        [size[0] // factor, size[1] // factor],
         method=method)
     low_resolution = tf.clip_by_value(low_resolution, 0, 255)
     high_resolution = tf.clip_by_value(high_resolution, 0, 255)
     return low_resolution, high_resolution
-  scale_fn.dimension = dimension
+  scale_fn.size = size
   return scale_fn
 
 
@@ -103,19 +107,19 @@ def augment_image(
   return augment_fn
 
 
-def reform_dataset(dataset, dimension, types):
+def reform_dataset(dataset, types, size):
   """ Helper function to convert the output_dtype of the dataset
       from (tf.float32, tf.uint8) to desired dtype
       Args:
         dataset: Source dataset(image-label dataset) to convert.
-        dimension: Dimension threshold of accepted image.
         types: tuple / list of target datatype.
+        size: [height, width] threshold of the images.
       Returns:
-        tf.data.Dataset with the images of dimension >= Args.dimension and types = Args.types
+        tf.data.Dataset with the images of dimension >= Args.size and types = Args.types
   """
   def generator_fn():
     for data in dataset:
-      if data[0].shape[0] >= dimension and data[0].shape[1] >= dimension:
+      if data[0].shape[0] >= size[0] and data[0].shape[1] >= size[1]:
         yield data[0], data[1]
       else:
         continue
@@ -160,7 +164,7 @@ def load_dataset_directory(
   if not tf.io.gfile.exists(cache_dir):
     tf.io.gfile.mkdir(cache_dir)
   dl_config = tfds.download.DownloadConfig(manual_dir=directory)
-  logging.info(low_res_map_fn.dimension)
+  logging.info(low_res_map_fn.size)
   dataset = reform_dataset(
       tfds.load(
           "image_label_folder/dataset_name=%s" %
@@ -169,8 +173,8 @@ def load_dataset_directory(
           as_supervised=True,
           download_and_prepare_kwargs={
               "download_config": dl_config}),
-      low_res_map_fn.dimension,
-      (tf.float32, tf.float32))
+      (tf.float32, tf.float32),
+      size=low_res_map_fn.size)
   dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
              .batch(batch_size)
              .prefetch(buffer_size)
@@ -222,8 +226,8 @@ def load_dataset(
           data_dir=data_dir,
           split=split,
           as_supervised=True),
-      low_res_map_fn.dimension,
-      (tf.float32, tf.float32))
+      (tf.float32, tf.float32),
+      size=low_res_map_fn.size)
 
   dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
              .batch(batch_size)

@@ -10,21 +10,19 @@ class VGGStudent01(abstract.Model):
     model_args = sett["student_config"]["vgg_student01"]
     self.scale_factor = sett["scale_factor"]
     depth = model_args["trunk_depth"]  # Minimum 2 for scale factor of 4
-    growth_channels = model_args["growth_channels"],
     convolution = partial(
-        tf.keras.layers.Conv2D,
+        tf.keras.layers.DepthwiseConv2D,
         kernel_size=[3, 3],
         padding="same",
         use_bias=model_args["use_bias"])
     self.layers = {
-        "conv_%d" % index: convolution(
-            filters=growth_channels) for index in range(1, depth + 1)}
-    self.last_layer = convolution(filters=3)
+        "conv_%d" % index: convolution() for index in range(1, depth + 1)}
+    self.last_layer = convolution()
 
   @tf.function(
       input_signature=[
           tf.TensorSpec(
-              shape=[None, None, None, 3],
+              shape=[None, 180, 270, 3], # For 720x1080 images
               dtype=tf.float32)])
   def call(self, inputs):
     intermediate = inputs
