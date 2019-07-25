@@ -59,19 +59,16 @@ def train_and_export(**kwargs):
       model_dir=kwargs["modeldir"])
   if kwargs["type"].lower().startswith("comparative"):
     trainer.train_comparative(student_generator)
-    stats["type"] = "comparative"
-    stats["trained"] = True
+    stats["comparative"] = True
   elif kwargs["type"].lower().startswith("adversarial"):
     trainer.train_adversarial(student_generator)
-    stats["type"] = "adversarial"
-    stats["trained"] = True
+    stats["adversarial"] = True
 
   tf.saved_model.save(
       student_generator,
       os.path.join(
           kwargs["modeldir"],
           "compressed_esrgan"))
-
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
