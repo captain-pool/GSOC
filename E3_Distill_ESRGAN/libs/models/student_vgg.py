@@ -16,9 +16,9 @@ class VGGStudent01(abstract.Model):
         kernel_size=[3, 3],
         padding="same",
         use_bias=model_args["use_bias"])
-    self.layers = {
+    self._conv_layers = {
         "conv_%d" % index: convolution() for index in range(1, depth + 1)}
-    self.last_layer = convolution()
+    self._last_layer = convolution()
 
   @tf.function(
       input_signature=[
@@ -27,11 +27,13 @@ class VGGStudent01(abstract.Model):
               dtype=tf.float32)])
   def call(self, inputs):
     intermediate = inputs
-    for layer_name in list(self.layers.keys())[:-self.scale_factor]:
-      intermediate = layers[layer_name](intermediate)
-    for layer_name in list(self.layers.keys())[-self.scale_factor:]:
+    for layer_name in list(self._conv_layers.keys())[:-self.scale_factor]:
+      intermediate = self._conv_layers[layer_name](intermediate)
+
+    for layer_name in list(self._conv_layers.keys())[-self.scale_factor:]:
       if not layer_name.endswith("_1"):
         intermediate = tf.keras.layers.LeakyReLU(alpha=0.2)(intermediate)
       pixel_shuffle = tf.nn.depth_to_space(intermediate, self.scale_factor)
-      intermediate = layers[layer_name](intermediate)
-    return self.last_layer(intermediate)
+      intermediate = self._conv_layers[layer_name](intermediate)
+
+    return self._last_layer(intermediate)

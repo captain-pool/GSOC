@@ -22,7 +22,12 @@ student_config:
     trunk_depth: 1
     param2: "two"
     paramN: "N"
-  name3:
-    param1: 1
-    param2: "two"
-    paramN: "N"
+  rrdb_student:
+    rdb_config:
+      depth: 5 # REDUCE
+      residual_scale_beta: 0.2
+    rrdb_config:
+      rdb_units: 3 # REDUCE
+      residual_scale_beta: 0.2
+    trunk_size: 3
+    growth_channels: 32
