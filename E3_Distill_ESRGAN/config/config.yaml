@@ -1,16 +1,33 @@
 # Config File for Distillation
+teacher_directory: "../E2_ESRGAN"
+teacher_config: "../E2_ESRGAN/config/config.yaml"
+mse_checkpoint: "checkpoints/mse_checkpoints/"
+adversarial_checkpoint: "checkpoints/adversarial_checkpoints/"
 
-student_network: "name1"
-student_networks_config:
-  name1:
-    param1: 1
+hr_size: [720, 1080]
+train:
+  iterations: 1
+  print_step: 100
+  checkpoint_step: 1000
+  balance_factor: 0.2 # alpha of Adversarial Training
+
+scale_factor: 4
+student_network: "vgg_student01"
+student_config:
+  vgg_student01:
+    trunk_depth: 3 # Minimum 2
+    # growth_channels: 32
+    use_bias: True
+  residual_student01:
+    trunk_depth: 1
     param2: "two"
     paramN: "N"
-  name2:
-    param1: 1
-    param2: "two"
-    paramN: "N"
-  name3:
-    param1: 1
-    param2: "two"
-    paramN: "N"
+  rrdb_student:
+    rdb_config:
+      depth: 5 # REDUCE
+      residual_scale_beta: 0.2
+    rrdb_config:
+      rdb_units: 3 # REDUCE
+      residual_scale_beta: 0.2
+    trunk_size: 3
+    growth_channels: 32
