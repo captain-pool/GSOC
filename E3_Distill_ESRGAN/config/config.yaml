@@ -11,17 +11,18 @@ train:
   checkpoint_step: 1000
   balance_factor: 0.2 # alpha of Adversarial Training
 
-scale_factor: 4
-student_network: "vgg_student01"
+scale_factor: 2
+scale_value: 2
+student_network: "vgg_student"
 student_config:
-  vgg_student01:
+  vgg_student:
     trunk_depth: 3 # Minimum 2
     # growth_channels: 32
     use_bias: True
-  residual_student01:
-    trunk_depth: 1
-    param2: "two"
-    paramN: "N"
+  residual_student:
+    trunk_depth: 2
+    use_bias: True
+    residual_scale_beta: 0.8
   rrdb_student:
     rdb_config:
       depth: 5 # REDUCE
