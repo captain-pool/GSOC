@@ -45,3 +45,4 @@ def load_checkpoint(checkpoint, name, basepath="", use_student_settings=False):
     logging.info("Found checkpoint: %s Path: %s" % (name, dir_))
     status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
     return status
+  logging.info("No Checkpoint found for %s" % name)

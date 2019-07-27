@@ -92,8 +92,8 @@ class Trainer(object):
         base_path=self.model_dir,
         use_student_settings=True)
     loss_fn = tf.keras.losses.MeanSquaredError()
-    metric_fn = tf.keras.losses.Mean()
-
+    metric_fn = tf.keras.metrics.Mean()
+    logging.info("Starting comparative loss training")
     for epoch in range(1, self.train_args["iterations"] + 1):
       metric_fn.reset_states()
       for image_lr, image_hr in self.dataset:
@@ -196,7 +196,6 @@ class Trainer(object):
             zip(generator_gradient, student.trainable_variables))
         discriminator_optimizer.apply_gradients(
             zip(discriminator_gradient, self.teacher_discriminator.trainable_variables))
-
         if status:
           status.assert_consumed()
           logging.info("Checkpoint consumed successfully")
