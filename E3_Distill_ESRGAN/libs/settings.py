@@ -17,7 +17,11 @@ def singleton(cls):
 @singleton
 class Settings(object):
   """ Settings class to handle yaml config files """
-  def __init__(self, filename="config.yaml", use_student_settings=False):
+  def __init__(
+      self,
+      filename="config/config.yaml",
+      use_student_settings=False):
+
     self.__path = os.path.abspath(filename)
 
   @property
