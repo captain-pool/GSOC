@@ -13,7 +13,7 @@ train:
 
 scale_factor: 2
 scale_value: 2
-student_network: "vgg_student"
+student_network: "rrdb_student"
 student_config:
   vgg_student:
     trunk_depth: 3 # Minimum 2
