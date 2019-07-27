@@ -16,7 +16,9 @@ def scale_down(method="bicubic", dimension=256, size=None, factor=4):
       Returns:
         tf.data.Dataset mappable python function based on the configuration.
   """
+  size_ = {"size": size}
   def scale_fn(image, *args, **kwargs):
+    size = size_["size"]
     high_resolution = image
     if not kwargs.get("no_random_crop", None):
       if not size:

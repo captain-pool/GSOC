@@ -22,6 +22,7 @@ Citation:
     bibsource = {dblp computer science bibliography, https://dblp.org}
   }
 """
+import os
 from absl import logging
 import argparse
 from libs.models import teacher
@@ -45,9 +46,9 @@ def train_and_export(**kwargs):
   teacher_settings = settings.Settings(
       student_settings["teacher_config"], use_student_settings=False)
   stats = settings.Stats(os.path.join(student_settings.path, "stats.yaml"))
-  summary_writer = tf.summmary.create_file_writer(
+  summary_writer = tf.summary.create_file_writer(
       os.path.join(kwargs["logdir"], "student"))
-  student_generator = model.Registry[student_settings["student_network"]]()
+  student_generator = model.Registry.models[student_settings["student_network"]]()
   teacher_generator = teacher.generator(out_channel=3)
   teacher_discriminator = teacher.discriminator()
   teacher_summary_writer = tf.summary.create_file_writer(
@@ -59,7 +60,7 @@ def train_and_export(**kwargs):
       summary_writer,
       data_dir=kwargs["datadir"],
       raw_data=kwargs["manual"],
-      model_dir=kwargs["modeldir"]
+      model_dir=kwargs["modeldir"],
       summary_writer_2=teacher_summary_writer)
 
   if kwargs["type"].lower().startswith("comparative"):
