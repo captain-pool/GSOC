@@ -1,6 +1,6 @@
 """ Trainer class to train student network to compress ESRGAN """
 
-from __future__ import absoulte_import
+from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
@@ -41,6 +41,7 @@ class Trainer(object):
     self.teacher_discriminator = discriminator
     self.teacher_settings = settings.Settings(use_student_settings=False)
     self.student_settings = settings.Settings(use_student_settings=True)
+    self.model_dir = model_dir
     dataset_args = self.teacher_settings["dataset"]
     self.train_args = self.student_settings["train"]
 
@@ -56,7 +57,7 @@ class Trainer(object):
       self.dataset = dataset.load_dataset(
           dataset_args["name"],
           dataset.scale_down(
-              method=dataset_args["scale_args"],
+              method=dataset_args["scale_method"],
               size=self.student_settings["hr_size"]),
           batch_size=self.teacher_settings["batch_size"],
           data_dir=data_dir)
@@ -85,7 +86,6 @@ class Trainer(object):
         student_generator=student,
         student_optimizer=optimizer,
         summary_step=tf.summary.experimental.get_step())
-    logging.info("Starting Training using Comparative Loss")
     status = utils.load_checkpoint(
         checkpoint,
         "comparative_checkpoint",
@@ -154,9 +154,10 @@ class Trainer(object):
         self.teacher_discriminator, type_="G")
     ra_discriminator = utils.RelativisticAverageLoss(
         self.teacher_discriminator, type_="D")
-    alpha = self.training_args["balance_factor"]
+    alpha = self.train_args["balance_factor"]
     generator_metric = tf.keras.metrics.Mean()
     discriminator_metric = tf.keras.metrics.Mean()
+    logging.info("Starting Adversarial Training")
 
     generator_optimizer = tf.optimizers.Adam()
     discriminator_optimizer = tf.optimizers.Adam()
@@ -174,7 +175,7 @@ class Trainer(object):
         basepath=self.model_dir,
         use_student_settings=True)
 
-    for epoch in range(1, self.student_settings["iterations"] + 1):
+    for epoch in range(1, self.train_args["iterations"] + 1):
       generator_metric.reset_states()
       discriminator_metric.reset_states()
       for image_lr, image_hr in self.dataset:
@@ -219,7 +220,7 @@ class Trainer(object):
           with self.summary_writer_2.as_default():
             tf.summary.scalar("psnr", teacher_psnr, step=step)
 
-        if step % self.student_settings["print_step"]:
+        if step % self.train_args["print_step"]:
           with self.summary_writer.as_default():
             tf.summary.image("low_res", tf.cast(
                 tf.clip_by_value(image_lr[:1], 0, 255), tf.uint8), step=step)
@@ -234,7 +235,7 @@ class Trainer(object):
               (epoch, step // epoch, loss))
 
         # Setting Up Checkpoint
-        if step % self.student_settings["checkpoint_step"]:
+        if step % self.train_args["checkpoint_step"]:
           utils.save_checkpoint(
               checkpoint,
               "adversarial_checkpoint",
