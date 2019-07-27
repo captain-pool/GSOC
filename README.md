@@ -5,6 +5,7 @@ Repository for Google Summer of Code 2019
 - Sachin Joglekar ([@srjoglekar246](https://github.com/srjoglekar246))
 - Vojtech Bardiovsky ([@vbardiovskyg](https://github.com/vbardiovskyg))
 
+### Tasks
 |Evaluation|Task|Link|Done|
 |:-:|:-:|:-:|:-:|
 |E1|Sample TF Hub Module Deploy.|[Here](E1_TFHub_Sample_Deploy)| :heavy_check_mark: |
