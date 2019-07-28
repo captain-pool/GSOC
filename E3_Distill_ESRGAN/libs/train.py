@@ -82,13 +82,13 @@ class Trainer(object):
     tf.summary.experimental.set_step(tf.Variable(0, tf.int64))
     optimizer = tf.optimizers.Adam()
     checkpoint = tf.train.Checkpoint(
-        generator=student,
-        optimizer=optimizer,
+        student_generator=student,
+        student_optimizer=optimizer,
         summary_step=tf.summary.experimental.get_step())
     logging.info("Starting Training using Comparative Loss")
     status = utils.load_checkpoint(
         checkpoint,
-        "mse_checkpoint",
+        "comparative_checkpoint",
         base_path=self.model_dir,
         use_student_settings=True)
     loss_fn = tf.keras.losses.MeanSquaredError()
@@ -135,7 +135,7 @@ class Trainer(object):
         if step % self.train_args["checkpoint_step"]:
           utils.save_checkpoint(
               checkpoint,
-              "mse_checkpoint",
+              "comparative_checkpoint",
               basepath=self.model_dir,
               use_student_settings=True)
         step.assign_add(1)
@@ -147,16 +147,6 @@ class Trainer(object):
       Args:
         student: Keras model of the student to train.
     """
-    checkpoint = tf.train.Checkpoint(
-        student_generator=student,
-        teacher_generator=self.teacher_generator,
-        teacher_discriminator=self.teacher_discriminator,
-        summary_step=tf.summary.experimental.get_step())
-    status = utils.load_checkpoint(
-        checkpoint,
-        "adversarial_checkpoint",
-        basepath=self.model_dir,
-        use_student_settings=True)
     if not tf.summary.experimental.get_step():
       tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
 
@@ -165,10 +155,24 @@ class Trainer(object):
     ra_discriminator = utils.RelativisticAverageLoss(
         self.teacher_discriminator, type_="D")
     alpha = self.training_args["balance_factor"]
-    generator_optimizer = tf.optimizers.Adam()
-    discriminator_optimizer = tf.optimizers.Adam()
     generator_metric = tf.keras.metrics.Mean()
     discriminator_metric = tf.keras.metrics.Mean()
+
+    generator_optimizer = tf.optimizers.Adam()
+    discriminator_optimizer = tf.optimizers.Adam()
+
+    checkpoint = tf.train.Checkpoint(
+        student_generator=student,
+        student_optimizer=generator_optimizer,
+        teacher_optimizer=discriminator_optimizer,
+        teacher_generator=self.teacher_generator,
+        teacher_discriminator=self.teacher_discriminator,
+        summary_step=tf.summary.experimental.get_step())
+    status = utils.load_checkpoint(
+        checkpoint,
+        "adversarial_checkpoint",
+        basepath=self.model_dir,
+        use_student_settings=True)
 
     for epoch in range(1, self.student_settings["iterations"] + 1):
       generator_metric.reset_states()
