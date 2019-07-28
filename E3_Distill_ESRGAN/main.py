@@ -58,9 +58,6 @@ def train_and_export(**kwargs):
   
   with strategy.scope():
     student_generator = model.Registry.models[student_settings["student_network"]]()
-    o = student_generator(tf.random.normal([1, 128, 128, 3]))
-    print(o.shape)
-    return
     teacher_generator = teacher.generator(out_channel=3)
     teacher_discriminator = teacher.discriminator()
     trainer = train.Trainer(

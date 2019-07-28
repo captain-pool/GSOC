@@ -38,11 +38,11 @@ class VGGStudent(abstract.Model):
         for index in range(1, self._scale_factor)}
     self._last_layer = conv_transpose(filters=3)
 
-  @tf.function(
-      input_signature=[
-          tf.TensorSpec(
-              shape=[None, None, None, 3],  # For 720x1080 images
-              dtype=tf.float32)])
+#  @tf.function(
+#      input_signature=[
+#          tf.TensorSpec(
+#              shape=[None, None, None, 3],  # For 720x1080 images
+#              dtype=tf.float32)])
   def call(self, inputs):
     intermediate = inputs
     for layer_name in self._conv_layers:
