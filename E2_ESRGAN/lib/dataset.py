@@ -134,8 +134,8 @@ def load_dataset_directory(
         directory,
         low_res_map_fn,
         batch_size=32,
-        shuffle=True,
-        augment=True,
+        shuffle=False,
+        augment=False,
         cache_dir="cache/",
         buffer_size=3 * 32):
   """ Loads image_label dataset from a local directory:
