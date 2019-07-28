@@ -58,35 +58,30 @@ def train_and_export(**kwargs):
   
   with strategy.scope():
     student_generator = model.Registry.models[student_settings["student_network"]]()
+    o = student_generator(tf.random.normal([1, 128, 128, 3]))
+    print(o.shape)
+    return
     teacher_generator = teacher.generator(out_channel=3)
     teacher_discriminator = teacher.discriminator()
-  
-  trainer = train.Trainer(
-      teacher_generator,
-      teacher_discriminator,
-      summary_writer,
-      data_dir=kwargs["datadir"],
-      raw_data=kwargs["manual"],
-      model_dir=kwargs["modeldir"],
-      summary_writer_2=teacher_summary_writer)
-  mode = None
-  trainer_fn = None
-  with strategy.scope():
+    trainer = train.Trainer(
+        teacher_generator,
+        teacher_discriminator,
+        summary_writer,
+        data_dir=kwargs["datadir"],
+        raw_data=kwargs["manual"],
+        model_dir=kwargs["modeldir"],
+        summary_writer_2=teacher_summary_writer)
     if kwargs["type"].lower().startswith("comparative"):
-      trainer_fn = trainer.train_comparative(student_generator)
-      mode = "comparative"
+      trainer.train_comparative(student_generator)
+      status["comparative"] = True
     elif kwargs["type"].lower().startswith("adversarial"):
-      trainer_fn = trainer.train_adversarial(student_generator)
-      mode = "adversarial"
-  if trainer_fn:
-    logging.info("Inside Trainer. Starting Training")
-    trainer_fn(strategy)
-    stats[mode] = True 
-    tf.saved_model.save(
-        student_generator,
-        os.path.join(
-            kwargs["modeldir"],
-            "compressed_esrgan"))
+      trainer.train_adversarial(student_generator)
+      status["adversarial"] = True
+#  tf.saved_model.save(
+#      student_generator,
+#      os.path.join(
+#          kwargs["modeldir"],
+#          "compressed_esrgan"))
   
 
 if __name__ == "__main__":

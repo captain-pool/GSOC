@@ -4,7 +4,7 @@ from functools import partial
 from libs.models import abstract
 from libs import settings
 import tensorflow as tf
-
+from absl import logging
 
 class ResidualDenseBlock(tf.keras.layers.Layer):
   """
