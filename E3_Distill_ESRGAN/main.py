@@ -80,7 +80,7 @@ def train_and_export(**kwargs):
       mode = "adversarial"
   if trainer_fn:
     logging.info("Inside Trainer. Starting Training")
-    trainer_fn()
+    trainer_fn(strategy)
     stats[mode] = True 
     tf.saved_model.save(
         student_generator,
