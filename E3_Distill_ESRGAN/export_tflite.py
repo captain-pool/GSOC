@@ -1,3 +1,4 @@
+import os
 from absl import logging
 import tensorflow as tf
 from libs import settings
@@ -6,8 +7,8 @@ from libs import utils
 
 
 def export_tflite(config="", modeldir="", mode="", **kwargs):
-  i = input("Don't forget to change the input_signature of the model.
-            press q to quit or return to continue")
+  i = input("""Don't forget to change the input_signature of the model.
+            press q to quit or return to continue""")
   if i.lower() is "q":
     return
   status = None
@@ -62,7 +63,7 @@ if __name__ == "__main__":
       action="count",
       help="Increases Verbosity. Repeat to increase more")
   log_levels = [logging.WARNING, logging.INFO, logging.DEBUG]
+  FLAGS, unknown = parser.parse_known_args()
   log_level = log_levels[min(FLAGS.verbose, len(log_levels) - 1)]
   logging.set_verbosity(log_level)
-  FLAGS, unknown = parser.parse_known_args()
-  export_tflite(**vars(FLAGS))
+    export_tflite(**vars(FLAGS))
