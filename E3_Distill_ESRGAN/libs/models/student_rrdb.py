@@ -67,8 +67,11 @@ class RRDBStudent(abstract.Model):
 
   def init(self):
     self.settings = settings.Settings(use_student_settings=True)
+    self._scale_factor = self.settings["scale_factor"]
+    self._scale_value = self.settings["scale_value"]
     rrdb_student_config = self.settings["student_config"]["rrdb_student"]
     rrdb_block = partial(ResidualInResidualBlock)
+    growth_channels = rrdb_student_config["growth_channels"]
     depthwise_convolution = partial(
         tf.keras.layers.DepthwiseConv2D,
         kernel_size=[3, 3],
@@ -79,29 +82,30 @@ class RRDBStudent(abstract.Model):
         kernel_size=[3, 3],
         strides=[1, 1],
         padding="same")
-    self.rrdb_trunk = tf.keras.Sequential(
+    conv_transpose = partial(
+        tf.keras.layers.Conv2DTranspose,
+        kernel_size=[3, 3],
+        strides=self._scale_value,
+        padding="same")
+    self._rrdb_trunk = tf.keras.Sequential(
         [rrdb_block() for _ in range(rrdb_student_config["trunk_size"])])
-    self.first_conv = depthwise_convolution()
-    self._conv_pre_last = convolution(rrdb_student_config["growth_channels"])
-    self._upsample1 = depthwise_convolution()
-    self._upsample2 = depthwise_convolution()
-    self._conv_last = convolution(3)
+    self._first_conv = depthwise_convolution()
+    self._upsample_layers = {
+        "upsample_%d" % index: conv_transpose(filters=growth_channels)
+        for index in range(1, self._scale_factor)}
+    self._conv_last = conv_transpose(filters=3)
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
 
   @tf.function(
       input_signature=[
           tf.TensorSpec(
-              shape=[None, 180, 270, 3],    # 720x1080 Images
+              shape=[None, None, None, 3],    # 720x1080 Images
               dtype=tf.float32)])
   def call(self, inputs):
-    residual_start = self.first_conv(inputs)
-    intermediate = residual_start + self.rrdb_trunk(residual_start)
-    intermediate = self._conv_pre_last(intermediate)
-    intermediate = self._lrelu(
-        self._upsample1(
-            tf.nn.depth_to_space(intermediate, 2)))
-    intermediate = self._lrelu(
-        self._upsample2(
-            tf.nn.depth_to_space(intermediate, 2)))
+    residual_start = self._first_conv(inputs)
+    intermediate = residual_start + self._rrdb_trunk(residual_start)
+    for layer_name in self._upsample_layers:
+      intermediate = self._lrelu(
+          self._upsample_layers[layer_name](intermediate))
     out = self._conv_last(intermediate)
     return out
