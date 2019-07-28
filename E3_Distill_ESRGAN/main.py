@@ -70,21 +70,24 @@ def train_and_export(**kwargs):
       model_dir=kwargs["modeldir"],
       summary_writer_2=teacher_summary_writer)
   mode = None
+  trainer_fn = None
   with strategy.scope():
     if kwargs["type"].lower().startswith("comparative"):
-      trainer.train_comparative(student_generator)
+      trainer_fn = trainer.train_comparative(student_generator)
       mode = "comparative"
     elif kwargs["type"].lower().startswith("adversarial"):
-      trainer.train_adversarial(student_generator)
+      trainer_fn = trainer.train_adversarial(student_generator)
       mode = "adversarial"
-  stats[mode] = True
+  if trainer_fn:
+    logging.info("Inside Trainer. Starting Training")
+    trainer_fn()
+    stats[mode] = True 
+    tf.saved_model.save(
+        student_generator,
+        os.path.join(
+            kwargs["modeldir"],
+            "compressed_esrgan"))
   
-  tf.saved_model.save(
-      student_generator,
-      os.path.join(
-          kwargs["modeldir"],
-          "compressed_esrgan"))
-
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()

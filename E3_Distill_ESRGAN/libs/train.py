@@ -95,7 +95,9 @@ class Trainer(object):
     metric_fn = tf.keras.metrics.Mean()
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
+    status_ = {"status": status}
     def train_fn():
+      status = status_["status"]
       logging.info("Starting comparative loss training")
       for epoch in range(1, self.train_args["iterations"] + 1):
         metric_fn.reset_states()
@@ -178,7 +180,9 @@ class Trainer(object):
         use_student_settings=True)
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
+    status_={"status": status}
     def train_fn():
+      status = status_["status"]
       logging.info("Starting Adversarial Training")
       for epoch in range(1, self.train_args["iterations"] + 1):
         student_psnr.reset_states()
