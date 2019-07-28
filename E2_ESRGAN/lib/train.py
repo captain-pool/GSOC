@@ -1,6 +1,5 @@
 import os
 import time
-import itertools
 from functools import partial
 from absl import logging
 import tensorflow as tf
@@ -10,7 +9,13 @@ from lib import utils, dataset
 class Trainer(object):
   """ Trainer class for ESRGAN """
 
-  def __init__(self, summary_writer, settings, data_dir=None, manual=False):
+  def __init__(
+          self,
+          summary_writer,
+          settings,
+          model_dir="",
+          data_dir=None,
+          manual=False):
     """ Setup the values and variables for Training.
         Args:
           summary_writer: tf.summary.SummaryWriter object to write summaries for Tensorboard.
@@ -19,6 +24,7 @@ class Trainer(object):
           manual (default: False): boolean to represent if data_dir is a manual dir.
     """
     self.settings = settings
+    self.model_dir = model_dir
     self.summary_writer = summary_writer
     self.iterations = self.settings["iterations"]
     dataset_args = self.settings["dataset"]
@@ -69,12 +75,12 @@ class Trainer(object):
         G_optimizer=G_optimizer,
         summary_step=tf.summary.experimental.get_step())
 
-    status = utils.load_checkpoint(checkpoint, "phase_1")
+    status = utils.load_checkpoint(checkpoint, "phase_1", self.model_dir)
     logging.debug("phase_1 status object: {}".format(status))
     previous_loss = float("inf")
     start_time = time.time()
     # Training starts
-    for epoch in range(self.iterations):
+    for epoch in range(1, self.iterations + 1):
       metric.reset_states()
       psnr_metric.reset_states()
       for image_lr, image_hr in self.dataset:
@@ -135,7 +141,7 @@ class Trainer(object):
                   time.time() -
                   start_time))
           if mean_loss < previous_loss:
-            utils.save_checkpoint(checkpoint, "phase_1")
+            utils.save_checkpoint(checkpoint, "phase_1", self.model_dir)
           previous_loss = mean_loss
           start_time = time.time()
 
@@ -178,19 +184,21 @@ class Trainer(object):
 
     if not tf.io.gfile.exists(
         os.path.join(
+            self.model_dir,
+            os.path.join(
             self.settings["checkpoint_path"]["phase_2"],
-            "checkpoint")):
+            "checkpoint"))):
       hot_start = tf.train.Checkpoint(
           G=generator,
           G_optimizer=G_optimizer,
           summary_step=tf.summary.experimental.get_step())
-      status = utils.load_checkpoint(hot_start, "phase_1")
+      status = utils.load_checkpoint(hot_start, "phase_1", self.model_dir)
       # consuming variable from checkpoint
       tf.summary.experimental.get_step()
 
       tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     else:
-      status = utils.load_checkpoint(checkpoint, "phase_2")
+      status = utils.load_checkpoint(checkpoint, "phase_2", self.model_dir)
 
     logging.debug("phase status object: {}".format(status))
 
@@ -201,7 +209,7 @@ class Trainer(object):
         weights="imagenet",
         input_shape=[hr_dimension, hr_dimension, 3],
         loss_type=phase_args["perceptual_loss_type"])
-    for epoch in range(self.iterations):
+    for epoch in range(1, self.iterations + 1):
       # Resetting Metrics
       gen_metric.reset_states()
       disc_metric.reset_states()
@@ -279,5 +287,5 @@ class Trainer(object):
                   gen_metric.result().numpy(),
                   disc_metric.result().numpy(), psnr.numpy(),
                   time.time() - start))
-          utils.save_checkpoint(checkpoint, "phase_2")
+          utils.save_checkpoint(checkpoint, "phase_2", self.model_dir)
           start = time.time()

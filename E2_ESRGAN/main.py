@@ -48,13 +48,14 @@ def main(**kwargs):
   sett = settings.Settings(kwargs["config"])
   Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
   summary_writer = tf.summary.create_file_writer(kwargs["log_dir"])
-  profiler.start_profiler_server(6009)
+  # profiler.start_profiler_server(6009)
   generator = model.RRDBNet(out_channel=3)
   discriminator = model.VGGArch()
 
   training = train.Trainer(
       summary_writer=summary_writer,
       settings=sett,
+      model_dir=kwargs["model_dir"],
       data_dir=kwargs["data_dir"],
       manual=kwargs["manual"])
   phases = list(map(lambda x: x.strip(),
@@ -76,7 +77,7 @@ def main(**kwargs):
         discriminator,
         sett["interpolation_parameter"],
         sett["dataset"]["hr_dimension"])
-    tf.saved_model.save(interpolated_generator, kwargs["model_dir"])
+    tf.saved_model.save(interpolated_generator, os.path.join(kwargs["model_dir"], "esrgan"))
 
 
 if __name__ == '__main__':
