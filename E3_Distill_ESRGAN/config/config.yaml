@@ -1,8 +1,9 @@
 # Config File for Distillation
 teacher_directory: "../E2_ESRGAN"
 teacher_config: "../E2_ESRGAN/config/config.yaml"
-comparative_checkpoint: "checkpoints/mse_checkpoints/"
-adversarial_checkpoint: "checkpoints/adversarial_checkpoints/"
+checkpoint_path:
+  comparative_checkpoint: "checkpoints/mse_checkpoints/"
+  adversarial_checkpoint: "checkpoints/adversarial_checkpoints/"
 
 hr_size: [720, 1080]
 train:
