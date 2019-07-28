@@ -16,13 +16,13 @@ class ResidualDenseBlock(tf.keras.layers.Layer):
     super(ResidualDenseBlock, self).__init__()
     self.settings = settings.Settings(use_student_settings=True)
     rdb_config = self.settings["student_config"]["rrdb_student"]["rdb_config"]
-    depthwise_convolution = partial(
-        tf.keras.layers.DepthwiseConv2D,
+    convolution = partial(
+        tf.keras.layers.Conv2D,
         kernel_size=[3, 3],
         strides=[1, 1],
         padding="same")
     self._conv_layers = {
-        "conv_%d" % index: depthwise_convolution()
+        "conv_%d" % index: convolution(filters=32)
         for index in range(1, rdb_config["depth"])}
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self._beta = rdb_config["residual_scale_beta"]
@@ -89,7 +89,7 @@ class RRDBStudent(abstract.Model):
         padding="same")
     self._rrdb_trunk = tf.keras.Sequential(
         [rrdb_block() for _ in range(rrdb_student_config["trunk_size"])])
-    self._first_conv = depthwise_convolution()
+    self._first_conv = convolution(filters=32)
     self._upsample_layers = {
         "upsample_%d" % index: conv_transpose(filters=growth_channels)
         for index in range(1, self._scale_factor)}
