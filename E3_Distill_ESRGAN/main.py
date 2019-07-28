@@ -48,12 +48,19 @@ def train_and_export(**kwargs):
   stats = settings.Stats(os.path.join(student_settings.path, "stats.yaml"))
   summary_writer = tf.summary.create_file_writer(
       os.path.join(kwargs["logdir"], "student"))
-  student_generator = model.Registry.models[student_settings["student_network"]]()
-  teacher_generator = teacher.generator(out_channel=3)
-  teacher_discriminator = teacher.discriminator()
   teacher_summary_writer = tf.summary.create_file_writer(
       os.path.join(kwargs["logdir"], "teacher"))
-
+  
+  cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
+  tf.config.experimental_connect_to_host(cluster_resolver.get_master())
+  tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
+  strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
+  
+  with strategy.scope():
+    student_generator = model.Registry.models[student_settings["student_network"]]()
+    teacher_generator = teacher.generator(out_channel=3)
+    teacher_discriminator = teacher.discriminator()
+  
   trainer = train.Trainer(
       teacher_generator,
       teacher_discriminator,
@@ -69,7 +76,7 @@ def train_and_export(**kwargs):
   elif kwargs["type"].lower().startswith("adversarial"):
     trainer.train_adversarial(student_generator)
     stats["adversarial"] = True
-
+  
   tf.saved_model.save(
       student_generator,
       os.path.join(
