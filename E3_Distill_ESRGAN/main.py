@@ -51,7 +51,7 @@ def train_and_export(**kwargs):
   teacher_summary_writer = tf.summary.create_file_writer(
       os.path.join(kwargs["logdir"], "teacher"))
   
-  cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
+  cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(kwargs["tpu"])
   tf.config.experimental_connect_to_host(cluster_resolver.get_master())
   tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
   strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
@@ -86,6 +86,7 @@ def train_and_export(**kwargs):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
+  parser.add_argument("--tpu", default=None, help="Name of the TPU to use")
   parser.add_argument("--logdir", default=None, help="Path to log directory")
   parser.add_argument(
       "--config",
