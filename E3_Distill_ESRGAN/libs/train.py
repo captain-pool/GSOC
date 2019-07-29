@@ -205,7 +205,7 @@ class Trainer(object):
         use_student_settings=True)
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
-
+    @tf.function
     def step_fn(image_lr, image_hr):
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         student_fake = student(image_lr)
@@ -245,7 +245,7 @@ class Trainer(object):
           discriminator_op,
           g_loss, d_loss]):
         return tf.identity(generator_loss)
-
+    @tf.function
     def train_step(image_lr, image_hr):
       gen_loss = self.strategy.experimental_run_v2(
           step_fn,
