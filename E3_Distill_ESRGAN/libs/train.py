@@ -229,7 +229,7 @@ class Trainer(object):
         generator_gradient = gen_tape.gradient(
             generator_loss, student.trainable_variables)
         discriminator_gradient = disc_tape.gradient(
-            discriminator_loss, self.teacher_generator.trainable_variables)
+            discriminator_loss, self.teacher_dicriminator.trainable_variables)
         generator_op = generator_optimizer.apply_gradients(
             zip(generator_gradient, student.trainable_variables))
         discriminator_op = discriminator_optimizer.apply_gradients(
