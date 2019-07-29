@@ -89,28 +89,31 @@ class VGGArch(tf.keras.Model):
     super(VGGArch, self).__init__()
     conv = partial(
         tf.keras.layers.Conv2D,
-        kernel_size=[3, 3], use_bias=use_bias)
+        kernel_size=[3, 3], use_bias=use_bias, padding="same")
+    batch_norm = lamda: tf.keras.layers.BatchNormalization()
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
-    self._batch_norm = tf.keras.layers.BatchNormalization()
     self._dense_1 = tf.keras.layers.Dense(1024)
     self._dense_2 = tf.keras.layers.Dense(output_shape)
     self._conv_layers = OrderedDict()
+    self._batch_norm = OrderedDict()
     self._conv_layers["conv_0_0"] = conv(filters=num_features, strides=1)
     self._conv_layers["conv_0_1"] = conv(filters=num_features, strides=2)
+    self._batch_norm["bn_0_1"] = batch_norm()
     for i in range(1, 4):
       for j in range(1, 3):
         self._conv_layers["conv_%d_%d" % (i, j)] = conv(filters=2**i*num_features, strides=j)
+        self._batch_norm["bn_%d_%d" % (i, j)] = batch_norm()
   def call(self, input_):
 
     features = self._lrelu(self._conv_layers["conv_0_0"](input_))
     features = self._lrelu(
-        self._batch_norm(
+        self._batch_norm["bn_0_1"](
             self._conv_layers["conv_0_1"](features)))
     # VGG Trunk
     for i in range(1, 4):
       for j in range(1, 3):
         features = self._lrelu(
-            self._batch_norm(
+            self._batch_norm["bn_%d_%d" % (i, j)](
                 self._conv_layers["conv_%d_%d" % (i, j)](features)))
 
     flattened = tf.keras.layers.Flatten()(features)
