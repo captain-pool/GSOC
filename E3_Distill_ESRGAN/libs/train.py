@@ -269,56 +269,56 @@ class Trainer(object):
       while True:
         try:
           image_lr, image_hr = next(self.dataset)
-          step = tf.summary.experimental.get_step()
-          logging.info("Start Train")
-          psnr_student, psnr_teacher = train_step(image_lr, image_hr)
-          student_psnr(psnr_student)
-          teacher_psnr(psnr_teacher)
-          logging.info("End Train")
-          if status:
-            status.assert_consumed()
-            logging.info("Checkpoint consumed successfully")
-            status = None
-          # Setting Up Logging
-          with self.summary_writer.as_default():
-            tf.summary.scalar(
-                "student_loss",
-                generator_metric.result(),
-                step=step)
-            tf.summary.scalar(
-                "teacher_discriminator_loss",
-                discriminator_metric.result(),
-                step=step)
-            tf.summary.scalar("psnr", student_psnr.result(), step=step)
-          if self.summary_writer_2:
-            with self.summary_writer_2.as_default():
-              tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
-
-          if step % self.train_args["print_step"]:
-            with self.strategy.scope():
-              student_fake = student(image_lr)
-              teacher_fake = self.teacher_generator(image_lr)
-            with self.summary_writer.as_default():
-              tf.summary.image("low_res", tf.cast(
-                  tf.clip_by_value(image_lr[:1], 0, 255), tf.uint8), step=step)
-              tf.summary.image("student_fake", tf.cast(
-                  tf.clip_by_value(student_fake[:1], 0, 255), tf.uint8), step=step)
-              tf.summary.image("teacher_fake", tf.cast(
-                  tf.clip_by_value(teacher_fake[:1], 0, 255), tf.uint8), step=step)
-              tf.summary.image("high_res", tf.cast(
-                  image_hr[:1], tf.uint8), step=step)
-            logging.info(
-                "[ADVERSARIAL] Epoch: %d\tBatch: %d\tStudent Loss: %f" %
-                (epoch, step // epoch, loss))
-
-          # Setting Up Checkpoint
-          if step % self.train_args["checkpoint_step"]:
-            utils.save_checkpoint(
-                checkpoint,
-                "adversarial_checkpoint",
-                basepath=self.modelpath,
-                use_student_settings=True)
-
-          step.assign_add(1)
-        except StopIteration:
+        except:
           break
+        step = tf.summary.experimental.get_step()
+        logging.info("Start Train")
+        psnr_student, psnr_teacher = train_step(image_lr, image_hr)
+        student_psnr(psnr_student)
+        teacher_psnr(psnr_teacher)
+        logging.info("End Train")
+        if status:
+          status.assert_consumed()
+          logging.info("Checkpoint consumed successfully")
+          status = None
+        # Setting Up Logging
+        with self.summary_writer.as_default():
+          tf.summary.scalar(
+              "student_loss",
+              generator_metric.result(),
+              step=step)
+          tf.summary.scalar(
+              "teacher_discriminator_loss",
+              discriminator_metric.result(),
+              step=step)
+          tf.summary.scalar("psnr", student_psnr.result(), step=step)
+        if self.summary_writer_2:
+          with self.summary_writer_2.as_default():
+            tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
+
+        if step % self.train_args["print_step"]:
+          with self.strategy.scope():
+            student_fake = student(image_lr)
+            teacher_fake = self.teacher_generator(image_lr)
+          with self.summary_writer.as_default():
+            tf.summary.image("low_res", tf.cast(
+                tf.clip_by_value(image_lr[:1], 0, 255), tf.uint8), step=step)
+            tf.summary.image("student_fake", tf.cast(
+                tf.clip_by_value(student_fake[:1], 0, 255), tf.uint8), step=step)
+            tf.summary.image("teacher_fake", tf.cast(
+                tf.clip_by_value(teacher_fake[:1], 0, 255), tf.uint8), step=step)
+            tf.summary.image("high_res", tf.cast(
+                image_hr[:1], tf.uint8), step=step)
+          logging.info(
+              "[ADVERSARIAL] Epoch: %d\tBatch: %d\tStudent Loss: %f" %
+              (epoch, step // epoch, loss))
+
+        # Setting Up Checkpoint
+        if step % self.train_args["checkpoint_step"]:
+          utils.save_checkpoint(
+              checkpoint,
+              "adversarial_checkpoint",
+              basepath=self.modelpath,
+              use_student_settings=True)
+
+        step.assign_add(1)
