@@ -148,6 +148,10 @@ class Trainer(object):
             tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
 
         if step % self.train_args["print_step"]:
+          with self.strategy.scope():
+            student_fake = student(image_lr)
+            teacher_fake = self.teacher_generator(image_lr)
+
           with self.summary_writer.as_default():
             tf.summary.image("low_res", tf.cast(
                 tf.clip_by_value(image_lr[:1], 0, 255), tf.uint8), step=step)
@@ -271,6 +275,9 @@ class Trainer(object):
             tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
   
         if step % self.train_args["print_step"]:
+          with self.strategy.scope():
+            student_fake = student(image_lr)
+            teacher_fake = self.teacher_generator(image_lr)
           with self.summary_writer.as_default():
             tf.summary.image("low_res", tf.cast(
                 tf.clip_by_value(image_lr[:1], 0, 255), tf.uint8), step=step)
