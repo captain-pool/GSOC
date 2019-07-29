@@ -17,12 +17,12 @@ class ResidualDenseBlock(tf.keras.layers.Layer):
     self.settings = settings.Settings(use_student_settings=True)
     rdb_config = self.settings["student_config"]["rrdb_student"]["rdb_config"]
     convolution = partial(
-        tf.keras.layers.Conv2D,
+        tf.keras.layers.DepthwiseConv2D,
         kernel_size=[3, 3],
         strides=[1, 1],
         padding="same")
     self._conv_layers = {
-        "conv_%d" % index: convolution(filters=32)
+        "conv_%d" % index: convolution()
         for index in range(1, rdb_config["depth"])}
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self._beta = rdb_config["residual_scale_beta"]
