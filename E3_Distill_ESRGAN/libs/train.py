@@ -18,15 +18,13 @@ class Trainer(object):
   """Trainer Class for Knowledge Distillation of ESRGAN"""
 
   def __init__(
-      self,
-      teacher,
-      discriminator,
-      summary_writer,
-      summary_writer_2=None,
-      data_dir="",
-      model_dir="",
-      raw_data=False,
-      strategy=None):
+          self,
+          teacher,
+          discriminator,
+          summary_writer,
+          summary_writer_2=None,
+          model_dir="",
+          strategy=None):
     """
       Args:
         teacher: Keras Model of pre-trained teacher generator.
@@ -46,9 +44,23 @@ class Trainer(object):
     self.student_settings = settings.Settings(use_student_settings=True)
     self.model_dir = model_dir
     self.strategy = strategy
-    dataset_args = self.teacher_settings["dataset"]
+
     self.train_args = self.student_settings["train"]
-    self.batch_size = self.teacher_settings["batch_size"] 
+    self.batch_size = self.teacher_settings["batch_size"]
+    self.summary_writer = summary_writer
+    self.summary_writer_2 = summary_writer_2
+    # Reloading Checkpoint from Phase 2 Training of ESRGAN
+    checkpoint = tf.train.Checkpoint(
+        G=self.teacher_generator,
+        D=self.teacher_discriminator)
+    utils.load_checkpoint(
+        checkpoint,
+        "phase_2",
+        basepath=model_dir,
+        use_student_settings=False)
+
+  def init_dataset(self, data_dir="", raw_data=False):
+    dataset_args = self.teacher_settings["dataset"]
     if raw_data:
       self.dataset = dataset.load_dataset_directory(
           dataset_args["name"],
@@ -65,18 +77,9 @@ class Trainer(object):
               size=self.student_settings["hr_size"]),
           batch_size=self.teacher_settings["batch_size"],
           data_dir=data_dir)
-    # self.dataset = self.strategy.experimental_distribute_dataset(self.dataset)
-    self.summary_writer = summary_writer
-    self.summary_writer_2 = summary_writer_2
-    # Reloading Checkpoint from Phase 2 Training of ESRGAN
-    checkpoint = tf.train.Checkpoint(
-        G=self.teacher_generator,
-        D=self.teacher_discriminator)
-    utils.load_checkpoint(
-        checkpoint,
-        "phase_2",
-        basepath=model_dir,
-        use_student_settings=False)
+    self.dataset = iter(
+        self.strategy.experimental_distribute_dataset(
+            self.dataset))
 
   def train_comparative(self, student):
     """
@@ -100,8 +103,9 @@ class Trainer(object):
     metric_fn = tf.keras.metrics.Mean()
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
+
     def train_step(image_lr, image_hr):
-      @tf.function 
+      @tf.function
       def step_fn(image_lr, image_hr):
         with tf.GradientTape() as tape:
           teacher_fake = self.teacher_generator(image_lr)
@@ -111,7 +115,7 @@ class Trainer(object):
           teacher_psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255.0)
           teacher_psnr = tf.reduce_mean(teacher_psnr) * (1.0 / self.batch_size)
           loss = loss_fn(teacher_fake, student_fake)
-          loss = tf.reduce_mean(loss) * (1.0 / self.batch_size)          
+          loss = tf.reduce_mean(loss) * (1.0 / self.batch_size)
         gradient = tape.gradient(loss, student.trainable_variables)
         train_op = optimizer.apply_gradients(
             zip(gradient, student.trainable_variables))
@@ -121,7 +125,7 @@ class Trainer(object):
                   tf.identity(teacher_psnr))
 
       per_replica_metrics = self.strategy.experimental_run_v2(
-          step_fn, args=(image_lr,image_hr))
+          step_fn, args=(image_lr, image_hr))
       reduce_fn = partial(self.strategy.reduce,
                           tf.distribute.ReduceOp.SUM, axis=None)
       return list(map(reduce_fn, per_replica_metrics))
@@ -132,7 +136,7 @@ class Trainer(object):
       teacher_psnr.reset_states()
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
-        loss, student_psnr_, teacher_psnr_= train_step(image_lr, image_hr)
+        loss, student_psnr_, teacher_psnr_ = train_step(image_lr, image_hr)
         student_psnr(student_psnr_)
         teacher_psnr(teacher_psnr_)
         metric_fn(loss)
@@ -172,6 +176,7 @@ class Trainer(object):
               basepath=self.model_dir,
               use_student_settings=True)
         step.assign_add(1)
+
   def train_adversarial(self, student):
     """
       Train the student adversarially using a joint loss between teacher discriminator
@@ -221,12 +226,14 @@ class Trainer(object):
         discriminator_loss = ra_discriminator(image_hr, student_fake)
         logging.info("teacher_ra")
         d_loss = discriminator_metric.update_state(discriminator_loss)
-        discriminator_loss = tf.reduce_mean(discriminator_loss) * (1.0 / self.batch_size)
+        discriminator_loss = tf.reduce_mean(
+            discriminator_loss) * (1.0 / self.batch_size)
         logging.info("disc_loss")
         mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
         generator_loss = alpha * student_ra_loss + (1 - alpha) * mse_loss
         g_loss = generator_metric.update_state(generator_loss)
-        generator_loss = tf.reduce_mean(generator_loss) * (1.0 / self.batch_size)
+        generator_loss = tf.reduce_mean(
+            generator_loss) * (1.0 / self.batch_size)
         logging.info("gen_loss")
       generator_gradient = gen_tape.gradient(
           generator_loss, student.trainable_variables)
@@ -241,10 +248,11 @@ class Trainer(object):
           zip(discriminator_gradient, self.teacher_discriminator.trainable_variables))
       logging.info("disc apply")
       with tf.control_dependencies([
-          generator_op,
-          discriminator_op,
-          g_loss, d_loss]):
+              generator_op,
+              discriminator_op,
+              g_loss, d_loss]):
         return tf.identity(generator_loss)
+
     @tf.function
     def train_step(image_lr, image_hr):
       gen_loss = self.strategy.experimental_run_v2(
@@ -258,55 +266,59 @@ class Trainer(object):
       teacher_psnr.reset_states()
       generator_metric.reset_states()
       discriminator_metric.reset_states()
-      for image_lr, image_hr in self.dataset:
-        step = tf.summary.experimental.get_step()
-        logging.info("Start Train")
-        psnr_student, psnr_teacher = train_step(image_lr, image_hr)
-        student_psnr(psnr_student)
-        teacher_psnr(psnr_teacher)
-        logging.info("End Train")
-        if status:
-          status.assert_consumed()
-          logging.info("Checkpoint consumed successfully")
-          status = None
-        # Setting Up Logging
-        with self.summary_writer.as_default():
-          tf.summary.scalar(
-              "student_loss",
-              generator_metric.result(),
-              step=step)
-          tf.summary.scalar(
-              "teacher_discriminator_loss",
-              discriminator_metric.result(),
-              step=step)
-          tf.summary.scalar("psnr", student_psnr.result(), step=step)
-        if self.summary_writer_2:
-          with self.summary_writer_2.as_default():
-            tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
-  
-        if step % self.train_args["print_step"]:
-          with self.strategy.scope():
-            student_fake = student(image_lr)
-            teacher_fake = self.teacher_generator(image_lr)
+      while True:
+        try:
+          image_lr, image_hr = next(self.dataset)
+          step = tf.summary.experimental.get_step()
+          logging.info("Start Train")
+          psnr_student, psnr_teacher = train_step(image_lr, image_hr)
+          student_psnr(psnr_student)
+          teacher_psnr(psnr_teacher)
+          logging.info("End Train")
+          if status:
+            status.assert_consumed()
+            logging.info("Checkpoint consumed successfully")
+            status = None
+          # Setting Up Logging
           with self.summary_writer.as_default():
-            tf.summary.image("low_res", tf.cast(
-                tf.clip_by_value(image_lr[:1], 0, 255), tf.uint8), step=step)
-            tf.summary.image("student_fake", tf.cast(
-                tf.clip_by_value(student_fake[:1], 0, 255), tf.uint8), step=step)
-            tf.summary.image("teacher_fake", tf.cast(
-                tf.clip_by_value(teacher_fake[:1], 0, 255), tf.uint8), step=step)
-            tf.summary.image("high_res", tf.cast(
-                image_hr[:1], tf.uint8), step=step)
-          logging.info(
-              "[ADVERSARIAL] Epoch: %d\tBatch: %d\tStudent Loss: %f" %
-              (epoch, step // epoch, loss))
-  
-        # Setting Up Checkpoint
-        if step % self.train_args["checkpoint_step"]:
-          utils.save_checkpoint(
-              checkpoint,
-              "adversarial_checkpoint",
-              basepath=self.modelpath,
-              use_student_settings=True)
-  
-        step.assign_add(1)
+            tf.summary.scalar(
+                "student_loss",
+                generator_metric.result(),
+                step=step)
+            tf.summary.scalar(
+                "teacher_discriminator_loss",
+                discriminator_metric.result(),
+                step=step)
+            tf.summary.scalar("psnr", student_psnr.result(), step=step)
+          if self.summary_writer_2:
+            with self.summary_writer_2.as_default():
+              tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
+
+          if step % self.train_args["print_step"]:
+            with self.strategy.scope():
+              student_fake = student(image_lr)
+              teacher_fake = self.teacher_generator(image_lr)
+            with self.summary_writer.as_default():
+              tf.summary.image("low_res", tf.cast(
+                  tf.clip_by_value(image_lr[:1], 0, 255), tf.uint8), step=step)
+              tf.summary.image("student_fake", tf.cast(
+                  tf.clip_by_value(student_fake[:1], 0, 255), tf.uint8), step=step)
+              tf.summary.image("teacher_fake", tf.cast(
+                  tf.clip_by_value(teacher_fake[:1], 0, 255), tf.uint8), step=step)
+              tf.summary.image("high_res", tf.cast(
+                  image_hr[:1], tf.uint8), step=step)
+            logging.info(
+                "[ADVERSARIAL] Epoch: %d\tBatch: %d\tStudent Loss: %f" %
+                (epoch, step // epoch, loss))
+
+          # Setting Up Checkpoint
+          if step % self.train_args["checkpoint_step"]:
+            utils.save_checkpoint(
+                checkpoint,
+                "adversarial_checkpoint",
+                basepath=self.modelpath,
+                use_student_settings=True)
+
+          step.assign_add(1)
+        except StopIteration:
+          break

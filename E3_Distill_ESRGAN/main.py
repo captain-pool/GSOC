@@ -64,11 +64,14 @@ def train_and_export(**kwargs):
         teacher_generator,
         teacher_discriminator,
         summary_writer,
-        data_dir=kwargs["datadir"],
-        raw_data=kwargs["manual"],
         model_dir=kwargs["modeldir"],
         summary_writer_2=teacher_summary_writer,
         strategy=strategy)
+
+  trainer.init_dataset(
+      data_dir=kwargs["datadir"],
+      raw_data=kwargs["manual"])
+  with strategy.scope():
     if kwargs["type"].lower().startswith("comparative"):
       trainer.train_comparative(student_generator)
       status["comparative"] = True
