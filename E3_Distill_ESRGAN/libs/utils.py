@@ -45,3 +45,10 @@ def load_checkpoint(checkpoint, name, basepath="", use_student_settings=False):
     status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
     return status
   logging.info("No Checkpoint found for %s" % name)
+
+# Losses
+
+def pixelwise_mse(y_true, y_pred):
+  mean_squared_error = tf.reduce_mean(
+      (y_true - y_pred)**2, axis=[1, 2, 3])
+  return tf.expand_dims(mean_squared_error, 1)

@@ -24,7 +24,8 @@ class Trainer(object):
       summary_writer_2=None,
       data_dir="",
       model_dir="",
-      raw_data=False):
+      raw_data=False
+      strategy=None):
     """
       Args:
         teacher: Keras Model of pre-trained teacher generator.
@@ -37,14 +38,16 @@ class Trainer(object):
         raw_data: Indicate if data_dir contains Raw Data or TFRecords.
         model_dir: Location to store checkpoints and SavedModel directory.
     """
+    assert(isinstance(strategy, tf.distribute.Strategy))
     self.teacher_generator = teacher
     self.teacher_discriminator = discriminator
     self.teacher_settings = settings.Settings(use_student_settings=False)
     self.student_settings = settings.Settings(use_student_settings=True)
     self.model_dir = model_dir
+    self.strategy = strategy
     dataset_args = self.teacher_settings["dataset"]
     self.train_args = self.student_settings["train"]
-
+    self.batch_size = self.teacher_settings["batch_size"] 
     if raw_data:
       self.dataset = dataset.load_dataset_directory(
           dataset_args["name"],
@@ -61,6 +64,7 @@ class Trainer(object):
               size=self.student_settings["hr_size"]),
           batch_size=self.teacher_settings["batch_size"],
           data_dir=data_dir)
+    self.dataset = self.strategy.experimental_distribute_dataset(self.dataset)
     self.summary_writer = summary_writer
     self.summary_writer_2 = summary_writer_2
     # Reloading Checkpoint from Phase 2 Training of ESRGAN
@@ -96,18 +100,30 @@ class Trainer(object):
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
 
-    @tf.function
     def train_step(image_lr, image_hr):
-      with tf.GradientTape() as tape:
-        teacher_fake = self.teacher_generator(image_lr)
-        student_fake = student(image_lr)
-        student_psnr(tf.image.psnr(image_hr, student_fake, max_val=255.0))
-        teacher_psnr(tf.image.psnr(image_hr, teacher_fake, max_val=255.0))
-        loss = loss_fn(teacher_fake, student_fake)
-        metric_fn(loss)
-      gradient = tape.gradient(loss, student.trainable_variables)
-      optimizer.apply_gradients(zip(gradient, student.trainable_variables))
+      def step_fn(image_lr, image_hr):
+        with tf.GradientTape() as tape:
+          teacher_fake = self.teacher_generator(image_lr)
+          student_fake = student(image_lr)
+          student_psnr = tf.image.psnr(image_hr, student_fake, max_val=255.0)
+          student_psnr = tf.reduce_mean(student_psnr) * (1.0 / self.batch_size)
+          teacher_psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255.0)
+          teacher_psnr = tf.reduce_mean(teacher_psnr) * (1.0 / self.batch_size)
+          loss = loss_fn(teacher_fake, student_fake)
+          loss = tf.reduce_mean(loss) * (1.0 / self.batch_size)          
+        gradient = tape.gradient(loss, student.trainable_variables)
+        train_op = optimizer.apply_gradients(
+            zip(gradient, student.trainable_variables))
+        with tf.control_dependencies([train_op]):
+          return (tf.identity(loss),
+                  tf.identity(student_psnr),
+                  tf.identity(teacher_psnr))
 
+      per_replica_metrics = self.strategy.experimental_run_v2(
+          step_fn, args=(image_lr,image_hr))
+      reduce_fn = partial(self.strategy.reduce,
+                          tf.distribute.ReduceOp.SUM, axis=None)
+      return map(reduce_fn, per_replica_metrics) 
     logging.info("Starting comparative loss training")
     for epoch in range(1, self.train_args["iterations"] + 1):
       metric_fn.reset_states()
@@ -115,7 +131,10 @@ class Trainer(object):
       teacher_psnr.reset_states()
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
-        train_step(image_lr, image_hr)
+        loss, student_psnr_, teacher_psnr_= train_step(image_lr, image_hr)
+        student_psnr(student_psnr_)
+        teacher_psnr(teacher_psnr_)
+        metric_fn(loss)
         if status:
           status.assert_consumed()
           logging.info("Checkpoint loaded successfully")
@@ -182,29 +201,42 @@ class Trainer(object):
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
 
-    @tf.function
     def train_step(image_lr, image_hr):
-      with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-        student_fake = student(image_lr)
-        psnr = tf.image.psnr(image_hr, student_fake, max_val=255)
-        student_psnr(psnr)
-        teacher_fake = self.teacher_generator(image_lr)
-        psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255)
-        teacher_psnr(psnr)
-        student_ra_loss = ra_generator(image_hr, student_fake)
-        discriminator_loss = ra_discriminator(image_hr, student_fake)
-        discriminator_metric(discriminator_loss)
-        mse_loss = tf.expand_dims(tf.reduce_mean(tf.pow(teacher_fake - student_fake, 2), axis=[1,2 ,3]), 1)
-        generator_loss = alpha * student_ra_loss + (1 - alpha) * mse_loss
-        generator_metric(generator_loss)
-      generator_gradient = gen_tape.gradient(
-          generator_loss, student.trainable_variables)
-      discriminator_gradient = disc_tape.gradient(
-          discriminator_loss, self.teacher_generator.trainable_variables)
-      generator_optimizer.apply_gradients(
-          zip(generator_gradient, student.trainable_variables))
-      discriminator_optimizer.apply_gradients(
-          zip(discriminator_gradient, self.teacher_discriminator.trainable_variables))
+      def step_fn(image_lr, image_hr):
+        with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
+          student_fake = student(image_lr)
+          psnr = tf.image.psnr(image_hr, student_fake, max_val=255)
+          student_psnr = tf.reduce_mean(psnr) * (1.0 / self.batch_size)
+          teacher_fake = self.teacher_generator(image_lr)
+          psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255)
+          teacher_psnr = tf.reduce_mean(psnr) * (1.0 / self.batch_size)
+          student_ra_loss = ra_generator(image_hr, student_fake)
+          discriminator_loss = ra_discriminator(image_hr, student_fake)
+          discriminator_loss = tf.reduce_mean(discriminator_loss) * (1.0 / self.batch_size)
+          mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
+          generator_loss = alpha * student_ra_loss + (1 - alpha) * mse_loss
+          generator_loss = tf.reduce_mean(generator_loss) * (1.0 / self.batch_size)
+        generator_gradient = gen_tape.gradient(
+            generator_loss, student.trainable_variables)
+        discriminator_gradient = disc_tape.gradient(
+            discriminator_loss, self.teacher_generator.trainable_variables)
+        generator_op = generator_optimizer.apply_gradients(
+            zip(generator_gradient, student.trainable_variables))
+        discriminator_op = discriminator_optimizer.apply_gradients(
+            zip(discriminator_gradient, self.teacher_discriminator.trainable_variables))
+        with tf.control_dependencies([generator_op, discriminator_op]):
+          return (tf.identity(generator_loss),
+                  tf.identity(discriminator_loss),
+                  tf.identity(teacher_psnr),
+                  tf.identity(student_psnr))
+      per_replica_metrics = self.strategy.experimental_run_v2(
+          step_fn,
+          args=(image_lr, image_hr))
+      reduce_fn = partial(
+          self.strategy.reduce,
+          tf.distribute.ReduceOp.SUM,
+          axis=None)
+      return map(reduce_fn, per_replica_metrics)
 
     logging.info("Starting Adversarial Training")
     for epoch in range(1, self.train_args["iterations"] + 1):
@@ -214,7 +246,11 @@ class Trainer(object):
       discriminator_metric.reset_states()
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
-        train_step(image_lr, image_hr)
+        gen_loss, disc_loss, t_psnr, s_psnr = train_step(image_lr, image_hr)
+        generator_metric(gen_loss)
+        discriminator_metric(disc_loss)
+        student_psnr(s_psnr)
+        teacher_psnr(t_psnr)
         if status:
           status.assert_consumed()
           logging.info("Checkpoint consumed successfully")

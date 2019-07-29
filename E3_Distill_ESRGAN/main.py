@@ -67,7 +67,8 @@ def train_and_export(**kwargs):
         data_dir=kwargs["datadir"],
         raw_data=kwargs["manual"],
         model_dir=kwargs["modeldir"],
-        summary_writer_2=teacher_summary_writer)
+        summary_writer_2=teacher_summary_writer,
+        strategy=strategy)
     if kwargs["type"].lower().startswith("comparative"):
       trainer.train_comparative(student_generator)
       status["comparative"] = True
