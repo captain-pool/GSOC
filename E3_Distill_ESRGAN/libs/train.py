@@ -213,18 +213,20 @@ class Trainer(object):
           student_fake = student(image_lr)
           logging.info("Student Fake")
           psnr = tf.image.psnr(image_hr, student_fake, max_val=255)
-          student_psnr = tf.reduce_mean(psnr) * (1.0 / self.batch_size)
+          psnr_1 = student_psnr(psnr)
           teacher_fake = self.teacher_generator(image_lr)
           logging.info("Teacher fake")
           psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255)
-          teacher_psnr = tf.reduce_mean(psnr) * (1.0 / self.batch_size)
+          psnr_2 = teacher_psnr(psnr)
           student_ra_loss = ra_generator(image_hr, student_fake)
           logging.info("student_ra")
           discriminator_loss = ra_discriminator(image_hr, student_fake)
           logging.info("teacher_ra")
+          d_loss = discriminator_metric(discriminator_loss)
           discriminator_loss = tf.reduce_mean(discriminator_loss) * (1.0 / self.batch_size)
           mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
           generator_loss = alpha * student_ra_loss + (1 - alpha) * mse_loss
+          g_loss = generator_metric(generator_loss)
           generator_loss = tf.reduce_mean(generator_loss) * (1.0 / self.batch_size)
         generator_gradient = gen_tape.gradient(
             generator_loss, student.trainable_variables)
@@ -234,19 +236,15 @@ class Trainer(object):
             zip(generator_gradient, student.trainable_variables))
         discriminator_op = discriminator_optimizer.apply_gradients(
             zip(discriminator_gradient, self.teacher_discriminator.trainable_variables))
-        with tf.control_dependencies([generator_op, discriminator_op]):
-          return (tf.identity(generator_loss),
-                  tf.identity(discriminator_loss),
-                  tf.identity(teacher_psnr),
-                  tf.identity(student_psnr))
-      per_replica_metrics = self.strategy.experimental_run_v2(
+        with tf.control_dependencies([
+            generator_op,
+            discriminator_op,
+            g_loss, d_loss,
+            psnr_1, psnr_2]):
+          return tf.no_op()
+      self.strategy.experimental_run_v2(
           step_fn,
           args=(image_lr, image_hr))
-      reduce_fn = partial(
-          self.strategy.reduce,
-          tf.distribute.ReduceOp.SUM,
-          axis=None)
-      return list(map(reduce_fn, per_replica_metrics))
 
     logging.info("Starting Adversarial Training")
     for epoch in range(1, self.train_args["iterations"] + 1):
@@ -257,12 +255,8 @@ class Trainer(object):
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
         logging.info("Start Train")
-        gen_loss, disc_loss, t_psnr, s_psnr = train_step(image_lr, image_hr)
+        train_step(image_lr, image_hr)
         logging.info("End Train")
-        generator_metric(gen_loss)
-        discriminator_metric(disc_loss)
-        student_psnr(s_psnr)
-        teacher_psnr(t_psnr)
         if status:
           status.assert_consumed()
           logging.info("Checkpoint consumed successfully")
