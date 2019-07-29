@@ -90,7 +90,7 @@ class VGGArch(tf.keras.Model):
     conv = partial(
         tf.keras.layers.Conv2D,
         kernel_size=[3, 3], use_bias=use_bias, padding="same")
-    batch_norm = lamda: tf.keras.layers.BatchNormalization()
+    batch_norm = lambda: tf.keras.layers.BatchNormalization()
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self._dense_1 = tf.keras.layers.Dense(1024)
     self._dense_2 = tf.keras.layers.Dense(output_shape)

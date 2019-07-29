@@ -46,6 +46,7 @@ class ResidualStudent(abstract.Model):
 #          tf.TensorSpec(
 #              shape=[None, None, None, 3],  # 720x1080 Images
 #              dtype=tf.float32)])
+  @tf.function
   def call(self, inputs):
     intermediate = inputs
     for layer_name in self._conv_layers:

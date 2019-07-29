@@ -7,6 +7,7 @@ from __future__ import print_function
 import os
 
 from absl import logging
+from functools import partial
 from lib import dataset
 from libs import settings
 from libs import utils
@@ -24,7 +25,7 @@ class Trainer(object):
       summary_writer_2=None,
       data_dir="",
       model_dir="",
-      raw_data=False
+      raw_data=False,
       strategy=None):
     """
       Args:
@@ -64,7 +65,7 @@ class Trainer(object):
               size=self.student_settings["hr_size"]),
           batch_size=self.teacher_settings["batch_size"],
           data_dir=data_dir)
-    self.dataset = self.strategy.experimental_distribute_dataset(self.dataset)
+    # self.dataset = self.strategy.experimental_distribute_dataset(self.dataset)
     self.summary_writer = summary_writer
     self.summary_writer_2 = summary_writer_2
     # Reloading Checkpoint from Phase 2 Training of ESRGAN
@@ -95,12 +96,12 @@ class Trainer(object):
         "comparative_checkpoint",
         basepath=self.model_dir,
         use_student_settings=True)
-    loss_fn = tf.keras.losses.MeanSquaredError()
+    loss_fn = tf.keras.losses.MeanSquaredError(reduction="none")
     metric_fn = tf.keras.metrics.Mean()
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
-
     def train_step(image_lr, image_hr):
+      @tf.function 
       def step_fn(image_lr, image_hr):
         with tf.GradientTape() as tape:
           teacher_fake = self.teacher_generator(image_lr)
@@ -123,7 +124,7 @@ class Trainer(object):
           step_fn, args=(image_lr,image_hr))
       reduce_fn = partial(self.strategy.reduce,
                           tf.distribute.ReduceOp.SUM, axis=None)
-      return map(reduce_fn, per_replica_metrics) 
+      return list(map(reduce_fn, per_replica_metrics))
     logging.info("Starting comparative loss training")
     for epoch in range(1, self.train_args["iterations"] + 1):
       metric_fn.reset_states()
@@ -204,18 +205,23 @@ class Trainer(object):
         use_student_settings=True)
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
-
+    
+    @tf.function
     def train_step(image_lr, image_hr):
       def step_fn(image_lr, image_hr):
         with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
           student_fake = student(image_lr)
+          logging.info("Student Fake")
           psnr = tf.image.psnr(image_hr, student_fake, max_val=255)
           student_psnr = tf.reduce_mean(psnr) * (1.0 / self.batch_size)
           teacher_fake = self.teacher_generator(image_lr)
+          logging.info("Teacher fake")
           psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255)
           teacher_psnr = tf.reduce_mean(psnr) * (1.0 / self.batch_size)
           student_ra_loss = ra_generator(image_hr, student_fake)
+          logging.info("student_ra")
           discriminator_loss = ra_discriminator(image_hr, student_fake)
+          logging.info("teacher_ra")
           discriminator_loss = tf.reduce_mean(discriminator_loss) * (1.0 / self.batch_size)
           mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
           generator_loss = alpha * student_ra_loss + (1 - alpha) * mse_loss
@@ -240,7 +246,7 @@ class Trainer(object):
           self.strategy.reduce,
           tf.distribute.ReduceOp.SUM,
           axis=None)
-      return map(reduce_fn, per_replica_metrics)
+      return list(map(reduce_fn, per_replica_metrics))
 
     logging.info("Starting Adversarial Training")
     for epoch in range(1, self.train_args["iterations"] + 1):
@@ -250,7 +256,9 @@ class Trainer(object):
       discriminator_metric.reset_states()
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
+        logging.info("Start Train")
         gen_loss, disc_loss, t_psnr, s_psnr = train_step(image_lr, image_hr)
+        logging.info("End Train")
         generator_metric(gen_loss)
         discriminator_metric(disc_loss)
         student_psnr(s_psnr)
