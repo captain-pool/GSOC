@@ -27,7 +27,6 @@ from absl import logging
 import argparse
 from libs import lazy_loader
 from libs import model
-from libs import train
 from libs import settings
 import tensorflow as tf
 
@@ -49,6 +48,7 @@ def train_and_export(**kwargs):
   # Lazy importing dependencies from teacher
   lazy.import_("teacher_imports", parent="libs", return_=False)
   lazy.import_("teacher", parent="libs.models", return_=False)
+  lazy.import_("train", parent="libs", return_=False)
   globals().update(lazy.import_dict)
 
   teacher_settings = settings.Settings(

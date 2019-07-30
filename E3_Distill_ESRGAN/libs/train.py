@@ -60,11 +60,9 @@ class Trainer(object):
         use_student_settings=False)
 
   def init_dataset(self, data_dir=""):
-    dataset_args = self.teacher_settings["dataset"]
-    dataset_options = tf.data.Options()
-    dataset_options.experimental_distribute.auto_shard = False
     with tf.device("/job:worker"):
-      self.dataset = dataset.load_dataset(data_dir)
+      self.dataset = dataset.load_dataset(data_dir, lr_size=[64, 64, 3], hr_size=[256, 256, 3])
+      self.dataset = self.dataset.batch(self.batch_size).prefetch(1024)
       self.dataset = iter(
           self.strategy.experimental_distribute_dataset(
               self.dataset))
@@ -198,55 +196,53 @@ class Trainer(object):
         use_student_settings=True)
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
-    @tf.function
+    
     def step_fn(image_lr, image_hr):
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         student_fake = student(image_lr)
         logging.info("Student Fake")
-        psnr = tf.image.psnr(image_hr, student_fake, max_val=255)
-        student_psnr(psnr)
+        s_psnr = tf.image.psnr(image_hr, student_fake, max_val=255)
         teacher_fake = self.teacher_generator(image_lr)
         logging.info("Teacher fake")
-        psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255)
-        teacher_psnr(psnr)
+        t_psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255)
         student_ra_loss = ra_generator(image_hr, student_fake)
         logging.info("student_ra")
         discriminator_loss = ra_discriminator(image_hr, student_fake)
         logging.info("teacher_ra")
-        d_loss = discriminator_metric.update_state(discriminator_loss)
         discriminator_loss = tf.reduce_mean(
             discriminator_loss) * (1.0 / self.batch_size)
         logging.info("disc_loss")
         mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
         generator_loss = alpha * student_ra_loss + (1 - alpha) * mse_loss
-        g_loss = generator_metric.update_state(generator_loss)
         generator_loss = tf.reduce_mean(
             generator_loss) * (1.0 / self.batch_size)
         logging.info("gen_loss")
+      student_vars = list(set(student.trainable_variables))
       generator_gradient = gen_tape.gradient(
-          generator_loss, student.trainable_variables)
+          generator_loss, student_vars)
       logging.info("gen gradient")
+      teacher_vars = list(set(self.teacher_discriminator.trainable_variables))
       discriminator_gradient = disc_tape.gradient(
-          discriminator_loss, self.teacher_discriminator.trainable_variables)
+          discriminator_loss, teacher_vars)
       logging.info("disc gradient")
       generator_op = generator_optimizer.apply_gradients(
-          zip(generator_gradient, student.trainable_variables))
+          zip(generator_gradient, student_vars))
       logging.info("gen apply")
       discriminator_op = discriminator_optimizer.apply_gradients(
-          zip(discriminator_gradient, self.teacher_discriminator.trainable_variables))
+          zip(discriminator_gradient, teacher_vars))
       logging.info("disc apply")
+      generator_metric(generator_loss)
+      discriminator_metric(discriminator_loss)
       with tf.control_dependencies([
               generator_op,
-              discriminator_op,
-              g_loss, d_loss]):
-        return tf.identity(generator_loss)
+              discriminator_op]):
+        return
 
     @tf.function
     def train_step(image_lr, image_hr):
-      gen_loss = self.strategy.experimental_run_v2(
+      self.strategy.experimental_run_v2(
           step_fn,
           args=(image_lr, image_hr))
-      return [0, 0]
 
     logging.info("Starting Adversarial Training")
     for epoch in range(1, self.train_args["iterations"] + 1):
@@ -261,7 +257,11 @@ class Trainer(object):
           break
         step = tf.summary.experimental.get_step()
         logging.info("Start Train")
-        psnr_student, psnr_teacher = train_step(image_lr, image_hr)
+        train_step(image_lr, image_hr)
+        student_fake = student(image_lr)
+        teacher_fake = self.teacher_generator(image_lr)
+        psnr_student = tf.image.psnr(student_fake, image_hr, max_val=255)
+        psnr_teacher = tf.image.psnr(teacher_fake, image_hr, max_val=255)
         student_psnr(psnr_student)
         teacher_psnr(psnr_teacher)
         logging.info("End Train")
@@ -285,9 +285,6 @@ class Trainer(object):
             tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
 
         if step % self.train_args["print_step"]:
-          with self.strategy.scope():
-            student_fake = student(image_lr)
-            teacher_fake = self.teacher_generator(image_lr)
           with self.summary_writer.as_default():
             tf.summary.image("low_res", tf.cast(
                 tf.clip_by_value(image_lr[:1], 0, 255), tf.uint8), step=step)

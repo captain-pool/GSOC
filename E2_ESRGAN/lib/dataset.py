@@ -133,7 +133,7 @@ def load_dataset_directory(
         name,
         directory,
         low_res_map_fn,
-        batch_size=32,
+        batch_size=None,
         shuffle=False,
         augment=False,
         cache_dir="cache/",
@@ -179,10 +179,11 @@ def load_dataset_directory(
       size=low_res_map_fn.size)
   if options:
     dataset.with_options(options)
-  dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-             .batch(batch_size)
-             .prefetch(buffer_size))
-             #.cache(cache_dir))
+  dataset = dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  if batch_size:
+    dataset = dataset.batch(batch_size)
+  dataset = dataset.prefetch(buffer_size)
+            #.cache(cache_dir))
 
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
@@ -200,7 +201,7 @@ def load_dataset(
         name,
         low_res_map_fn,
         split="train",
-        batch_size=32,
+        batch_size=None,
         shuffle=True,
         augment=True,
         buffer_size=3 * 32,
@@ -235,9 +236,10 @@ def load_dataset(
       size=low_res_map_fn.size)
   if options:
     dataset.with_options(options)
-  dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-             .batch(batch_size)
-             .prefetch(buffer_size))
+  dataset = dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  if batch_size:
+    dataset = dataset.batch(batch_size)
+  dataset = dataset.prefetch(buffer_size)
              #.cache(cache_dir))
 
   if shuffle:

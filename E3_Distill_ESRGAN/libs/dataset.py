@@ -20,20 +20,18 @@ def generate_tf_record(
         data_dir,
         dataset.scale_down(
             method=dataset_args["scale_method"],
-            size=student_sett["hr_size"]),
-        batch_size=teacher_sett["batch_size"])
+            size=student_sett["hr_size"]))
   else:
     ds = dataset.load_dataset(
         dataset_args["name"],
         dataset.scale_down(
             method=dataset_args["scale_method"],
             size=student_sett["hr_size"]),
-        batch_size=teacher_sett["batch_size"],
         data_dir=data_dir)
   to_tfrecord(ds, tfrecord_path)
 
 
-def load_dataset(tfrecord_path):
+def load_dataset(tfrecord_path, lr_size, hr_size):
   def _parse_tf_record(serialized_example):
     features = {
         "low_res_image": tf.io.FixedLenFeature([], dtype=tf.string),
@@ -42,9 +40,11 @@ def load_dataset(tfrecord_path):
     lr_image = tf.io.parse_tensor(
         example["low_res_image"],
         out_type=tf.float32)
+    lr_image = tf.reshape(lr_image, lr_size) 
     hr_image = tf.io.parse_tensor(
         example["high_res_image"],
         out_type=tf.float32)
+    hr_image = tf.reshape(hr_image, hr_size)
     return lr_image, hr_image
   files = tf.io.gfile.glob(
           os.path.join(tfrecord_path, "*.tfrecord"))
