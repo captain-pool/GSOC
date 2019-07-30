@@ -25,7 +25,7 @@ Citation:
 import os
 from absl import logging
 import argparse
-from libs.models import teacher
+from libs import lazy_loader
 from libs import model
 from libs import train
 from libs import settings
@@ -41,8 +41,16 @@ def train_and_export(**kwargs):
         datadir: Path to custom data directory.
         manual: Boolean to indicate if `datadir` contains Raw Files(True) / TFRecords (False)
   """
+  lazy = lazy_loader.LazyLoader()
+
   student_settings = settings.Settings(
       kwargs["config"], use_student_settings=True)
+
+  # Lazy importing dependencies from teacher
+  lazy.import_("teacher_imports", parent="libs", return_=False)
+  lazy.import_("teacher", parent="libs.models", return_=False)
+  globals().update(lazy.import_dict)
+
   teacher_settings = settings.Settings(
       student_settings["teacher_config"], use_student_settings=False)
   stats = settings.Stats(os.path.join(student_settings.path, "stats.yaml"))
@@ -50,14 +58,16 @@ def train_and_export(**kwargs):
       os.path.join(kwargs["logdir"], "student"))
   teacher_summary_writer = tf.summary.create_file_writer(
       os.path.join(kwargs["logdir"], "teacher"))
-  
-  cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(kwargs["tpu"])
+
+  cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
+      kwargs["tpu"])
   tf.config.experimental_connect_to_host(cluster_resolver.get_master())
   tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
   strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
-  
+
   with strategy.scope():
-    student_generator = model.Registry.models[student_settings["student_network"]]()
+    student_generator = model.Registry.models[student_settings["student_network"]](
+    )
     teacher_generator = teacher.generator(out_channel=3)
     teacher_discriminator = teacher.discriminator()
     trainer = train.Trainer(
@@ -83,7 +93,7 @@ def train_and_export(**kwargs):
 #      os.path.join(
 #          kwargs["modeldir"],
 #          "compressed_esrgan"))
-  
+
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()

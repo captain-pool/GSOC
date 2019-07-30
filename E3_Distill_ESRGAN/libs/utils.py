@@ -1,17 +1,10 @@
 """ Module containing utility functions for the trainer """
 import os
-import sys
 
 from absl import logging
 from libs import settings
 import tensorflow as tf
-
 # Loading utilities from ESRGAN
-sys.path.insert(
-    0,
-    os.path.abspath(
-        settings.Settings(use_student_settings=True)["teacher_directory"]))
-
 from lib.utils import RelativisticAverageLoss
 
 
