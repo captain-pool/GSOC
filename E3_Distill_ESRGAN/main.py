@@ -81,13 +81,12 @@ def train_and_export(**kwargs):
         strategy=strategy)
 
   trainer.init_dataset(data_dir=kwargs["datadir"])
-  with strategy.scope():
-    if kwargs["type"].lower().startswith("comparative"):
-      trainer.train_comparative(student_generator)
-      stats["comparative"] = True
-    elif kwargs["type"].lower().startswith("adversarial"):
-      trainer.train_adversarial(student_generator)
-      stats["adversarial"] = True
+  if kwargs["type"].lower().startswith("comparative"):
+    trainer.train_comparative(student_generator)
+    stats["comparative"] = True
+  elif kwargs["type"].lower().startswith("adversarial"):
+    trainer.train_adversarial(student_generator)
+    stats["adversarial"] = True
 #  tf.saved_model.save(
 #      student_generator,
 #      os.path.join(
