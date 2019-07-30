@@ -61,25 +61,31 @@ class Trainer(object):
 
   def init_dataset(self, data_dir="", raw_data=False):
     dataset_args = self.teacher_settings["dataset"]
-    if raw_data:
-      self.dataset = dataset.load_dataset_directory(
-          dataset_args["name"],
-          data_dir,
-          dataset.scale_down(
-              method=dataset_args["scale_method"],
-              size=self.student_settings["hr_size"]),
-          batch_size=self.teacher_settings["batch_size"])
-    else:
-      self.dataset = dataset.load_dataset(
-          dataset_args["name"],
-          dataset.scale_down(
-              method=dataset_args["scale_method"],
-              size=self.student_settings["hr_size"]),
-          batch_size=self.teacher_settings["batch_size"],
-          data_dir=data_dir)
-    self.dataset = iter(
-        self.strategy.experimental_distribute_dataset(
-            self.dataset))
+    dataset_options = tf.data.Options()
+    dataset_options.experimental_distribute.auto_shard = False
+    with tf.device("/job:worker"):
+      if raw_data:
+        self.dataset = dataset.load_dataset_directory(
+            dataset_args["name"],
+            data_dir,
+            dataset.scale_down(
+                method=dataset_args["scale_method"],
+                size=self.student_settings["hr_size"]),
+            batch_size=self.teacher_settings["batch_size"],
+            options=dataset_options)
+      else:
+        self.dataset = dataset.load_dataset(
+            dataset_args["name"],
+            dataset.scale_down(
+                method=dataset_args["scale_method"],
+                size=self.student_settings["hr_size"]),
+            batch_size=self.teacher_settings["batch_size"],
+            data_dir=data_dir,
+            options=dataset_options)
+      self.dataset.with_options(dataset_options)
+      self.dataset = iter(
+          self.strategy.experimental_distribute_dataset(
+              self.dataset))
 
   def train_comparative(self, student):
     """
@@ -269,7 +275,7 @@ class Trainer(object):
       while True:
         try:
           image_lr, image_hr = next(self.dataset)
-        except:
+        except StopIteration:
           break
         step = tf.summary.experimental.get_step()
         logging.info("Start Train")

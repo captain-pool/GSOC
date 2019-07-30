@@ -137,7 +137,8 @@ def load_dataset_directory(
         shuffle=False,
         augment=False,
         cache_dir="cache/",
-        buffer_size=3 * 32):
+        buffer_size=3 * 32,
+        options=None):
   """ Loads image_label dataset from a local directory:
       Structure of the local directory should be:
 
@@ -176,6 +177,8 @@ def load_dataset_directory(
               "download_config": dl_config}),
       (tf.float32, tf.float32),
       size=low_res_map_fn.size)
+  if options:
+    dataset.with_options(options)
   dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
              .batch(batch_size)
              .prefetch(buffer_size))
@@ -202,7 +205,8 @@ def load_dataset(
         augment=True,
         buffer_size=3 * 32,
         cache_dir="cache/",
-        data_dir=None):
+        data_dir=None,
+        options=None):
   """ Helper function to load a dataset from tensorflow_datasets
       Args:
           name: Name of the dataset builder from tensorflow_datasets to load the data.
@@ -229,7 +233,8 @@ def load_dataset(
           as_supervised=True),
       (tf.float32, tf.float32),
       size=low_res_map_fn.size)
-
+  if options:
+    dataset.with_options(options)
   dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
              .batch(batch_size)
              .prefetch(buffer_size))
