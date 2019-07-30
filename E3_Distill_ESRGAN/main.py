@@ -66,8 +66,10 @@ def train_and_export(**kwargs):
   strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
 
   with strategy.scope():
-    student_generator = model.Registry.models[student_settings["student_network"]](
-    )
+    student_generator = (
+        model
+        .Registry
+        .models[student_settings["student_network"]]())
     teacher_generator = teacher.generator(out_channel=3)
     teacher_discriminator = teacher.discriminator()
     trainer = train.Trainer(
@@ -78,9 +80,7 @@ def train_and_export(**kwargs):
         summary_writer_2=teacher_summary_writer,
         strategy=strategy)
 
-  trainer.init_dataset(
-      data_dir=kwargs["datadir"],
-      raw_data=kwargs["manual"])
+  trainer.init_dataset(data_dir=kwargs["datadir"])
   with strategy.scope():
     if kwargs["type"].lower().startswith("comparative"):
       trainer.train_comparative(student_generator)
@@ -106,12 +106,7 @@ if __name__ == "__main__":
   parser.add_argument(
       "--datadir",
       default=None,
-      help="Path to custom data directory")
-  parser.add_argument(
-      "--manual",
-      default=False,
-      action="store_true",
-      help="Specify if datadir stores files instead of TFRecords")
+      help="Path to custom data directory containing sharded TFRecords")
   parser.add_argument(
       "--modeldir",
       default=None,

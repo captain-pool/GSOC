@@ -46,14 +46,15 @@ def load_dataset(tfrecord_path):
         example["high_res_image"],
         out_type=tf.float32)
     return lr_image, hr_image
-  files = tf.convert_to_tensor(
-      tf.io.gfile.glob(
-          os.path.join(
-              tfrecord_path,
-              "*.tfrecord")))
-  if files.dtype is not tf.string:
+  files = tf.io.gfile.glob(
+          os.path.join(tfrecord_path, "*.tfrecord"))
+  if len(files) == 0:
     raise ValueError("Path Doesn't contain any file")
   ds = tf.data.TFRecordDataset(files).map(_parse_tf_record)
+  if len(files) == 1:
+    option = tf.data.Options()
+    option.auto_shard = False
+    ds.with_options(ds)
   return ds
 
 

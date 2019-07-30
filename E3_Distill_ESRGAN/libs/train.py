@@ -8,7 +8,7 @@ import os
 
 from absl import logging
 from functools import partial
-from lib import dataset
+from libs import dataset
 from libs import settings
 from libs import utils
 import tensorflow as tf
@@ -59,30 +59,12 @@ class Trainer(object):
         basepath=model_dir,
         use_student_settings=False)
 
-  def init_dataset(self, data_dir="", raw_data=False):
+  def init_dataset(self, data_dir=""):
     dataset_args = self.teacher_settings["dataset"]
     dataset_options = tf.data.Options()
     dataset_options.experimental_distribute.auto_shard = False
     with tf.device("/job:worker"):
-      if raw_data:
-        self.dataset = dataset.load_dataset_directory(
-            dataset_args["name"],
-            data_dir,
-            dataset.scale_down(
-                method=dataset_args["scale_method"],
-                size=self.student_settings["hr_size"]),
-            batch_size=self.teacher_settings["batch_size"],
-            options=dataset_options)
-      else:
-        self.dataset = dataset.load_dataset(
-            dataset_args["name"],
-            dataset.scale_down(
-                method=dataset_args["scale_method"],
-                size=self.student_settings["hr_size"]),
-            batch_size=self.teacher_settings["batch_size"],
-            data_dir=data_dir,
-            options=dataset_options)
-      self.dataset.with_options(dataset_options)
+      self.dataset = dataset.load_dataset(data_dir)
       self.dataset = iter(
           self.strategy.experimental_distribute_dataset(
               self.dataset))
