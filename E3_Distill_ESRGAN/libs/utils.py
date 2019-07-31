@@ -7,6 +7,7 @@ import tensorflow as tf
 # Loading utilities from ESRGAN
 from lib.utils import RelativisticAverageLoss
 
+
 def checkpoint_exists(names, basepath="", use_student_settings=False):
   sett = settings.Settings(use_student_settings=use_student_settings)
   if tf.nest.is_nested(names):

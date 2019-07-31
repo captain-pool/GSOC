@@ -61,39 +61,39 @@ def train_and_export(**kwargs):
   tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
   strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
 
-  with strategy.scope():
-    with tf.device("/job:worker"):
-      summary_writer = tf.summary.create_file_writer(
-          os.path.join(kwargs["logdir"], "student"))
-      teacher_summary_writer = tf.summary.create_file_writer(
-          os.path.join(kwargs["logdir"], "teacher"))
+  with tf.device("/job:worker"), strategy.scope():
+    summary_writer = tf.summary.create_file_writer(
+        os.path.join(kwargs["logdir"], "student"))
+    teacher_summary_writer = tf.summary.create_file_writer(
+        os.path.join(kwargs["logdir"], "teacher"))
 
     student_generator = (
-        model
-        .Registry
+        model.Registry
         .models[student_settings["student_network"]]())
+
     teacher_generator = teacher.generator(out_channel=3)
     teacher_discriminator = teacher.discriminator()
+
     trainer = train.Trainer(
         teacher_generator,
         teacher_discriminator,
         summary_writer,
-        model_dir=kwargs["modeldir"],
         summary_writer_2=teacher_summary_writer,
+        model_dir=kwargs["modeldir"],
+        data_dir=kwargs["data_dir"],
         strategy=strategy)
 
-  trainer.init_dataset(data_dir=kwargs["datadir"])
-  if kwargs["type"].lower().startswith("comparative"):
-    trainer.train_comparative(student_generator)
-    stats["comparative"] = True
-  elif kwargs["type"].lower().startswith("adversarial"):
-    trainer.train_adversarial(student_generator)
-    stats["adversarial"] = True
-#  tf.saved_model.save(
-#      student_generator,
-#      os.path.join(
-#          kwargs["modeldir"],
-#          "compressed_esrgan"))
+    if kwargs["type"].lower().startswith("comparative"):
+      trainer.train_comparative(student_generator)
+      stats["comparative"] = True
+    elif kwargs["type"].lower().startswith("adversarial"):
+      trainer.train_adversarial(student_generator)
+      stats["adversarial"] = True
+  #  tf.saved_model.save(
+  #      student_generator,
+  #      os.path.join(
+  #          kwargs["modeldir"],
+  #          "compressed_esrgan"))
 
 
 if __name__ == "__main__":
