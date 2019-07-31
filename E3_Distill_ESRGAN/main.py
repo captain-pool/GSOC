@@ -54,10 +54,6 @@ def train_and_export(**kwargs):
   teacher_settings = settings.Settings(
       student_settings["teacher_config"], use_student_settings=False)
   stats = settings.Stats(os.path.join(student_settings.path, "stats.yaml"))
-  summary_writer = tf.summary.create_file_writer(
-      os.path.join(kwargs["logdir"], "student"))
-  teacher_summary_writer = tf.summary.create_file_writer(
-      os.path.join(kwargs["logdir"], "teacher"))
 
   cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
       kwargs["tpu"])
@@ -66,19 +62,25 @@ def train_and_export(**kwargs):
   strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
 
   with strategy.scope():
+    with tf.device("/job:worker"):
+      summary_writer = tf.summary.create_file_writer(
+          os.path.join(kwargs["logdir"], "student"))
+      teacher_summary_writer = tf.summary.create_file_writer(
+          os.path.join(kwargs["logdir"], "teacher"))
+
     student_generator = (
         model
         .Registry
         .models[student_settings["student_network"]]())
     teacher_generator = teacher.generator(out_channel=3)
     teacher_discriminator = teacher.discriminator()
-    trainer = train.Trainer(
-        teacher_generator,
-        teacher_discriminator,
-        summary_writer,
-        model_dir=kwargs["modeldir"],
-        summary_writer_2=teacher_summary_writer,
-        strategy=strategy)
+  trainer = train.Trainer(
+      teacher_generator,
+      teacher_discriminator,
+      summary_writer,
+      model_dir=kwargs["modeldir"],
+      summary_writer_2=teacher_summary_writer,
+      strategy=strategy)
 
   trainer.init_dataset(data_dir=kwargs["datadir"])
   if kwargs["type"].lower().startswith("comparative"):

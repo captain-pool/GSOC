@@ -17,7 +17,7 @@ def save_checkpoint(checkpoint, name, basepath="", use_student_settings=False):
         student: boolean to indicate if settings of the student should be used.
   """
   sett = settings.Settings(use_student_settings=use_student_settings)
-  dir_ = os.path.join(basepath, sett["checkpoint_path"][name], checkpoint)
+  dir_ = os.path.join(basepath, sett["checkpoint_path"][name], "checkpoint")
   logging.info("Saving checkpoint: %s Path: %s" % (name, dir_))
   prefix = os.path.join(dir_, os.path.basename(dir_))
   checkpoint.save(file_prefix=prefix)
