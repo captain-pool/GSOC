@@ -74,13 +74,13 @@ def train_and_export(**kwargs):
         .models[student_settings["student_network"]]())
     teacher_generator = teacher.generator(out_channel=3)
     teacher_discriminator = teacher.discriminator()
-  trainer = train.Trainer(
-      teacher_generator,
-      teacher_discriminator,
-      summary_writer,
-      model_dir=kwargs["modeldir"],
-      summary_writer_2=teacher_summary_writer,
-      strategy=strategy)
+    trainer = train.Trainer(
+        teacher_generator,
+        teacher_discriminator,
+        summary_writer,
+        model_dir=kwargs["modeldir"],
+        summary_writer_2=teacher_summary_writer,
+        strategy=strategy)
 
   trainer.init_dataset(data_dir=kwargs["datadir"])
   if kwargs["type"].lower().startswith("comparative"):

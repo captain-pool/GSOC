@@ -50,22 +50,27 @@ class Trainer(object):
     self.summary_writer = summary_writer
     self.summary_writer_2 = summary_writer_2
     # Reloading Checkpoint from Phase 2 Training of ESRGAN
-    checkpoint = tf.train.Checkpoint(
-        G=self.teacher_generator,
-        D=self.teacher_discriminator)
-    utils.load_checkpoint(
-        checkpoint,
-        "phase_2",
-        basepath=model_dir,
-        use_student_settings=False)
+    if not utils.checkpoint_exists(
+        names=[
+          "comparative_checkpoint",
+          "adversarial_checkpoint"],
+        basepath=self.model_dir,
+        use_student_settings=True):
+      checkpoint = tf.train.Checkpoint(
+          G=self.teacher_generator,
+          D=self.teacher_discriminator)
+      utils.load_checkpoint(
+          checkpoint,
+          "phase_2",
+          basepath=model_dir,
+          use_student_settings=False)
 
   def init_dataset(self, data_dir=""):
     with tf.device("/job:worker"), self.strategy.scope():
       self.dataset = dataset.load_dataset(data_dir, lr_size=[64, 64, 3], hr_size=[256, 256, 3])
       self.dataset = self.dataset.batch(self.batch_size, drop_remainder=True)
-      self.dataset = iter(
-          self.strategy.experimental_distribute_dataset(
-              self.dataset))
+      self.dataset = self.strategy.experimental_distribute_dataset(
+              self.dataset)
 
   def train_comparative(self, student):
     """
@@ -184,19 +189,18 @@ class Trainer(object):
       discriminator_metric = tf.keras.metrics.Mean()
       generator_optimizer = tf.optimizers.Adam()
       discriminator_optimizer = tf.optimizers.Adam()
-    checkpoint = tf.train.Checkpoint(
-        student_generator=student,
-        student_optimizer=generator_optimizer,
-        teacher_optimizer=discriminator_optimizer,
-        teacher_generator=self.teacher_generator,
-        teacher_discriminator=self.teacher_discriminator,
-        summary_step=tf.summary.experimental.get_step())
-    status = utils.load_checkpoint(
-        checkpoint,
-        "adversarial_checkpoint",
-        basepath=self.model_dir,
-        use_student_settings=True)
-    with tf.device("/job:worker"), self.strategy.scope():
+      checkpoint = tf.train.Checkpoint(
+          student_generator=student,
+          student_optimizer=generator_optimizer,
+          teacher_optimizer=discriminator_optimizer,
+          teacher_generator=self.teacher_generator,
+          teacher_discriminator=self.teacher_discriminator,
+          summary_step=tf.summary.experimental.get_step())
+      status = utils.load_checkpoint(
+          checkpoint,
+          "adversarial_checkpoint",
+          basepath=self.model_dir,
+          use_student_settings=True)
       student_psnr = tf.keras.metrics.Mean()
       teacher_psnr = tf.keras.metrics.Mean()
       def step_fn(image_lr, image_hr):
@@ -253,13 +257,9 @@ class Trainer(object):
         return list(map(lambda x: reduce_fn(value=x), metrics))
       logging.info("Starting Adversarial Training")
       for epoch in range(1, self.train_args["iterations"] + 1):
-        while True:
+        for image_lr, image_hr in self.dataset:
           step = tf.summary.experimental.get_step()
           logging.info("Start Train")
-          try:
-            image_lr, image_hr = next(self.dataset)
-          except StopIteration:
-            break
           gen_loss, disc_loss = train_step(image_lr, image_hr)
           logging.info("%s" % step)
           if status:

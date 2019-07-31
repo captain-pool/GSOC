@@ -7,6 +7,19 @@ import tensorflow as tf
 # Loading utilities from ESRGAN
 from lib.utils import RelativisticAverageLoss
 
+def checkpoint_exists(names, basepath="", use_student_settings=False):
+  sett = settings.Settings(use_student_settings=use_student_settings)
+  if tf.nest.is_nested(names):
+    if isinstance(names, dict):
+      return False
+  else:
+    names = [names]
+  values = []
+  for name in names:
+    dir_ = os.path.join(basepath, sett["checkpoint_path"][name], "checkpoint")
+    values.append(tf.io.gfile.exists(dir_))
+  return any(values)
+
 
 def save_checkpoint(checkpoint, name, basepath="", use_student_settings=False):
   """ Saves Checkpoint
