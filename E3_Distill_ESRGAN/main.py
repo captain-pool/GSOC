@@ -22,11 +22,11 @@ Citation:
     bibsource = {dblp computer science bibliography, https://dblp.org}
   }
 """
+import os
 from absl import logging
 import argparse
-from libs.models import teacher
+from libs import lazy_loader
 from libs import model
-from libs import train
 from libs import settings
 import tensorflow as tf
 
@@ -40,44 +40,65 @@ def train_and_export(**kwargs):
         datadir: Path to custom data directory.
         manual: Boolean to indicate if `datadir` contains Raw Files(True) / TFRecords (False)
   """
+  lazy = lazy_loader.LazyLoader()
+
   student_settings = settings.Settings(
       kwargs["config"], use_student_settings=True)
+
+  # Lazy importing dependencies from teacher
+  lazy.import_("teacher_imports", parent="libs", return_=False)
+  lazy.import_("teacher", parent="libs.models", return_=False)
+  lazy.import_("train", parent="libs", return_=False)
+  globals().update(lazy.import_dict)
+
   teacher_settings = settings.Settings(
       student_settings["teacher_config"], use_student_settings=False)
   stats = settings.Stats(os.path.join(student_settings.path, "stats.yaml"))
-  summary_writer = tf.summmary.create_file_writer(
-      os.path.join(kwargs["logdir"], "student"))
-  student_generator = model.Registry[student_settings["student_network"]]()
-  teacher_generator = teacher.generator(out_channel=3)
-  teacher_discriminator = teacher.discriminator()
-  teacher_summary_writer = tf.summary.create_file_writer(
-      os.path.join(kwargs["logdir"], "teacher"))
 
-  trainer = train.Trainer(
-      teacher_generator,
-      teacher_discriminator,
-      summary_writer,
-      data_dir=kwargs["datadir"],
-      raw_data=kwargs["manual"],
-      model_dir=kwargs["modeldir"]
-      summary_writer_2=teacher_summary_writer)
+  cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
+      kwargs["tpu"])
+  tf.config.experimental_connect_to_host(cluster_resolver.get_master())
+  tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
+  strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
 
-  if kwargs["type"].lower().startswith("comparative"):
-    trainer.train_comparative(student_generator)
-    stats["comparative"] = True
-  elif kwargs["type"].lower().startswith("adversarial"):
-    trainer.train_adversarial(student_generator)
-    stats["adversarial"] = True
+  with tf.device("/job:worker"), strategy.scope():
+    summary_writer = tf.summary.create_file_writer(
+        os.path.join(kwargs["logdir"], "student"))
+    teacher_summary_writer = tf.summary.create_file_writer(
+        os.path.join(kwargs["logdir"], "teacher"))
 
-  tf.saved_model.save(
-      student_generator,
-      os.path.join(
-          kwargs["modeldir"],
-          "compressed_esrgan"))
+    student_generator = (
+        model.Registry
+        .models[student_settings["student_network"]]())
+
+    teacher_generator = teacher.generator(out_channel=3)
+    teacher_discriminator = teacher.discriminator()
+
+    trainer = train.Trainer(
+        teacher_generator,
+        teacher_discriminator,
+        summary_writer,
+        summary_writer_2=teacher_summary_writer,
+        model_dir=kwargs["modeldir"],
+        data_dir=kwargs["data_dir"],
+        strategy=strategy)
+
+    if kwargs["type"].lower().startswith("comparative"):
+      trainer.train_comparative(student_generator)
+      stats["comparative"] = True
+    elif kwargs["type"].lower().startswith("adversarial"):
+      trainer.train_adversarial(student_generator)
+      stats["adversarial"] = True
+  #  tf.saved_model.save(
+  #      student_generator,
+  #      os.path.join(
+  #          kwargs["modeldir"],
+  #          "compressed_esrgan"))
 
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
+  parser.add_argument("--tpu", default=None, help="Name of the TPU to use")
   parser.add_argument("--logdir", default=None, help="Path to log directory")
   parser.add_argument(
       "--config",
@@ -86,12 +107,7 @@ if __name__ == "__main__":
   parser.add_argument(
       "--datadir",
       default=None,
-      help="Path to custom data directory")
-  parser.add_argument(
-      "--manual",
-      default=False,
-      action="store_true",
-      help="Specify if datadir stores files instead of TFRecords")
+      help="Path to custom data directory containing sharded TFRecords")
   parser.add_argument(
       "--modeldir",
       default=None,

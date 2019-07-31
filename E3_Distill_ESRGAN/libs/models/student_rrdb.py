@@ -4,7 +4,7 @@ from functools import partial
 from libs.models import abstract
 from libs import settings
 import tensorflow as tf
-
+from absl import logging
 
 class ResidualDenseBlock(tf.keras.layers.Layer):
   """
@@ -16,13 +16,13 @@ class ResidualDenseBlock(tf.keras.layers.Layer):
     super(ResidualDenseBlock, self).__init__()
     self.settings = settings.Settings(use_student_settings=True)
     rdb_config = self.settings["student_config"]["rrdb_student"]["rdb_config"]
-    depthwise_convolution = partial(
+    convolution = partial(
         tf.keras.layers.DepthwiseConv2D,
         kernel_size=[3, 3],
         strides=[1, 1],
         padding="same")
     self._conv_layers = {
-        "conv_%d" % index: depthwise_convolution()
+        "conv_%d" % index: convolution()
         for index in range(1, rdb_config["depth"])}
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self._beta = rdb_config["residual_scale_beta"]
@@ -89,18 +89,18 @@ class RRDBStudent(abstract.Model):
         padding="same")
     self._rrdb_trunk = tf.keras.Sequential(
         [rrdb_block() for _ in range(rrdb_student_config["trunk_size"])])
-    self._first_conv = depthwise_convolution()
+    self._first_conv = convolution(filters=32)
     self._upsample_layers = {
         "upsample_%d" % index: conv_transpose(filters=growth_channels)
         for index in range(1, self._scale_factor)}
     self._conv_last = conv_transpose(filters=3)
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
 
-  @tf.function(
-      input_signature=[
-          tf.TensorSpec(
-              shape=[None, None, None, 3],    # 720x1080 Images
-              dtype=tf.float32)])
+#  @tf.function(
+#      input_signature=[
+#          tf.TensorSpec(
+#              shape=[None, None, None, 3],    # 720x1080 Images
+#              dtype=tf.float32)])
   def call(self, inputs):
     residual_start = self._first_conv(inputs)
     intermediate = residual_start + self._rrdb_trunk(residual_start)

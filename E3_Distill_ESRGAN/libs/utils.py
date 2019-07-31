@@ -1,18 +1,25 @@
 """ Module containing utility functions for the trainer """
 import os
-import sys
 
 from absl import logging
 from libs import settings
 import tensorflow as tf
-
 # Loading utilities from ESRGAN
-sys.path.insert(
-    0,
-    os.path.abspath(
-        settings.Settings(use_student_settings=True)["teacher_directory"]))
-
 from lib.utils import RelativisticAverageLoss
+
+
+def checkpoint_exists(names, basepath="", use_student_settings=False):
+  sett = settings.Settings(use_student_settings=use_student_settings)
+  if tf.nest.is_nested(names):
+    if isinstance(names, dict):
+      return False
+  else:
+    names = [names]
+  values = []
+  for name in names:
+    dir_ = os.path.join(basepath, sett["checkpoint_path"][name], "checkpoint")
+    values.append(tf.io.gfile.exists(dir_))
+  return any(values)
 
 
 def save_checkpoint(checkpoint, name, basepath="", use_student_settings=False):
@@ -24,7 +31,7 @@ def save_checkpoint(checkpoint, name, basepath="", use_student_settings=False):
         student: boolean to indicate if settings of the student should be used.
   """
   sett = settings.Settings(use_student_settings=use_student_settings)
-  dir_ = os.path.join(basepath, sett[name], checkpoint)
+  dir_ = os.path.join(basepath, sett["checkpoint_path"][name], "checkpoint")
   logging.info("Saving checkpoint: %s Path: %s" % (name, dir_))
   prefix = os.path.join(dir_, os.path.basename(dir_))
   checkpoint.save(file_prefix=prefix)
@@ -38,11 +45,18 @@ def load_checkpoint(checkpoint, name, basepath="", use_student_settings=False):
         basepath: base directory where checkpoint is located.
         student: boolean to indicate if settings of the student should be used.
   """
-
   sett = settings.Settings(use_student_settings=use_student_settings)
-  dir_ = os.path.join(basepath, sett[name], "checkpoint")
+  dir_ = os.path.join(basepath, sett["checkpoint_path"][name], "checkpoint")
   if tf.io.gfile.exists(dir_):
     logging.info("Found checkpoint: %s Path: %s" % (name, dir_))
     status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
     return status
   logging.info("No Checkpoint found for %s" % name)
+
+# Losses
+
+
+def pixelwise_mse(y_true, y_pred):
+  mean_squared_error = tf.reduce_mean(
+      (y_true - y_pred)**2, axis=[1, 2, 3])
+  return tf.expand_dims(mean_squared_error, 1)

@@ -5,7 +5,7 @@ checkpoint_path:
   comparative_checkpoint: "checkpoints/mse_checkpoints/"
   adversarial_checkpoint: "checkpoints/adversarial_checkpoints/"
 
-hr_size: [720, 1080]
+hr_size: [256, 256]
 train:
   iterations: 1
   print_step: 100
@@ -26,10 +26,10 @@ student_config:
     residual_scale_beta: 0.8
   rrdb_student:
     rdb_config:
-      depth: 5 # REDUCE
+      depth: 3
       residual_scale_beta: 0.2
     rrdb_config:
-      rdb_units: 3 # REDUCE
+      rdb_units: 2
       residual_scale_beta: 0.2
     trunk_size: 3
     growth_channels: 32

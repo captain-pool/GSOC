@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from functools import partial
 import tensorflow as tf
 from lib import utils
@@ -86,31 +87,36 @@ class VGGArch(tf.keras.Model):
   def __init__(self, output_shape=1, num_features=64, use_bias=True):
 
     super(VGGArch, self).__init__()
-    self.conv = lambda n, s, x: tf.keras.layers.Conv2D(
-        n, kernel_size=[3, 3], strides=[s, s], use_bias=use_bias)(x)
-    self.num_features = num_features
-    self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
-    self.batch_norm = lambda x: tf.keras.layers.BatchNormalization()(x)
-    self.dense = tf.keras.layers.Dense
-    self._output_shape = output_shape
-
+    conv = partial(
+        tf.keras.layers.Conv2D,
+        kernel_size=[3, 3], use_bias=use_bias, padding="same")
+    batch_norm = lambda: tf.keras.layers.BatchNormalization()
+    self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
+    self._dense_1 = tf.keras.layers.Dense(1024)
+    self._dense_2 = tf.keras.layers.Dense(output_shape)
+    self._conv_layers = OrderedDict()
+    self._batch_norm = OrderedDict()
+    self._conv_layers["conv_0_0"] = conv(filters=num_features, strides=1)
+    self._conv_layers["conv_0_1"] = conv(filters=num_features, strides=2)
+    self._batch_norm["bn_0_1"] = batch_norm()
+    for i in range(1, 4):
+      for j in range(1, 3):
+        self._conv_layers["conv_%d_%d" % (i, j)] = conv(filters=2**i*num_features, strides=j)
+        self._batch_norm["bn_%d_%d" % (i, j)] = batch_norm()
   def call(self, input_):
 
-    features = self.lrelu(self.conv(self.num_features, 1, input_))
-    features = self.lrelu(
-        self.batch_norm(
-            self.conv(
-                self.num_features,
-                2,
-                features)))
+    features = self._lrelu(self._conv_layers["conv_0_0"](input_))
+    features = self._lrelu(
+        self._batch_norm["bn_0_1"](
+            self._conv_layers["conv_0_1"](features)))
     # VGG Trunk
     for i in range(1, 4):
       for j in range(1, 3):
-        features = self.lrelu(
-            self.batch_norm(
-                self.conv(2**i * self.num_features, j, features)))
+        features = self._lrelu(
+            self._batch_norm["bn_%d_%d" % (i, j)](
+                self._conv_layers["conv_%d_%d" % (i, j)](features)))
 
     flattened = tf.keras.layers.Flatten()(features)
-    dense = self.lrelu(self.dense(1024)(flattened))
-    out = self.dense(self._output_shape)(dense)
+    dense = self._lrelu(self._dense_1(flattened))
+    out = self._dense_2(dense)
     return out

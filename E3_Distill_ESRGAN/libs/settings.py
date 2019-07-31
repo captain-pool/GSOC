@@ -2,8 +2,10 @@
 import os
 import yaml
 
+
 def singleton(cls):
   instances = {}
+
   def getinstance(*args, **kwargs):
     distill_config = kwargs.get("use_student_settings", "")
     key = cls.__name__
@@ -14,13 +16,15 @@ def singleton(cls):
     return instances[key]
   return getinstance
 
+
 @singleton
 class Settings(object):
   """ Settings class to handle yaml config files """
+
   def __init__(
-      self,
-      filename="config/config.yaml",
-      use_student_settings=False):
+          self,
+          filename="config/config.yaml",
+          use_student_settings=False):
 
     self.__path = os.path.abspath(filename)
 
@@ -34,11 +38,16 @@ class Settings(object):
 
   def get(self, index, default=None):
     with open(self.__path, "r") as file_:
-      return yaml.load(file_.read(), Loader=yaml.FullLoader).get(index, default)
+      return yaml.load(
+          file_.read(),
+          Loader=yaml.FullLoader).get(
+          index,
+          default)
 
 
 class Stats(object):
   """ Class to handle Training Statistics File """
+
   def __init__(self, filename="stats.yaml"):
     if os.path.exists(filename):
       with open(filename, "r") as file_:

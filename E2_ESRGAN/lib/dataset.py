@@ -16,7 +16,9 @@ def scale_down(method="bicubic", dimension=256, size=None, factor=4):
       Returns:
         tf.data.Dataset mappable python function based on the configuration.
   """
+  size_ = {"size": size}
   def scale_fn(image, *args, **kwargs):
+    size = size_["size"]
     high_resolution = image
     if not kwargs.get("no_random_crop", None):
       if not size:
@@ -131,11 +133,12 @@ def load_dataset_directory(
         name,
         directory,
         low_res_map_fn,
-        batch_size=32,
-        shuffle=True,
-        augment=True,
+        batch_size=None,
+        shuffle=False,
+        augment=False,
         cache_dir="cache/",
-        buffer_size=3 * 32):
+        buffer_size=3 * 32,
+        options=None):
   """ Loads image_label dataset from a local directory:
       Structure of the local directory should be:
 
@@ -174,10 +177,13 @@ def load_dataset_directory(
               "download_config": dl_config}),
       (tf.float32, tf.float32),
       size=low_res_map_fn.size)
-  dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-             .batch(batch_size)
-             .prefetch(buffer_size))
-             #.cache(cache_dir))
+  if options:
+    dataset.with_options(options)
+  dataset = dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  if batch_size:
+    dataset = dataset.batch(batch_size)
+  dataset = dataset.prefetch(buffer_size)
+            #.cache(cache_dir))
 
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
@@ -195,12 +201,13 @@ def load_dataset(
         name,
         low_res_map_fn,
         split="train",
-        batch_size=32,
+        batch_size=None,
         shuffle=True,
         augment=True,
         buffer_size=3 * 32,
         cache_dir="cache/",
-        data_dir=None):
+        data_dir=None,
+        options=None):
   """ Helper function to load a dataset from tensorflow_datasets
       Args:
           name: Name of the dataset builder from tensorflow_datasets to load the data.
@@ -227,10 +234,12 @@ def load_dataset(
           as_supervised=True),
       (tf.float32, tf.float32),
       size=low_res_map_fn.size)
-
-  dataset = (dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-             .batch(batch_size)
-             .prefetch(buffer_size))
+  if options:
+    dataset.with_options(options)
+  dataset = dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  if batch_size:
+    dataset = dataset.batch(batch_size)
+  dataset = dataset.prefetch(buffer_size)
              #.cache(cache_dir))
 
   if shuffle:
