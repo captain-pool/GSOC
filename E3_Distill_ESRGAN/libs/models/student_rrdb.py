@@ -101,6 +101,12 @@ class RRDBStudent(abstract.Model):
 #          tf.TensorSpec(
 #              shape=[None, None, None, 3],    # 720x1080 Images
 #              dtype=tf.float32)])
+  def signed_call():
+    return tf.function(
+      input_signature=[
+          tf.TensorSpec(
+              shape=[None, 180, 270, 3],
+              dtype=tf.float32)])(call)
   def call(self, inputs):
     residual_start = self._first_conv(inputs)
     intermediate = residual_start + self._rrdb_trunk(residual_start)
