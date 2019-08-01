@@ -43,8 +43,13 @@ class RRDBNet(tf.keras.Model):
         [self.rrdb_block() for _ in range(trunk_size)])
     self.conv_trunk = conv(filters=num_features)
     # Upsample
-    self.upsample1 = conv(filters=num_features)
-    self.upsample2 = conv(filters=num_features)
+    conv_transpose = partial(
+        tf.keras.layers.Conv2DTranspose,
+        strides=2,
+        kernel_size=3,
+        padding="same")
+    self.upsample1 = conv_transpose(filters=num_features)
+    self.upsample2 = conv_transpose(filters=num_features)
     self.conv_last_1 = conv(filters=num_features)
     self.conv_last_2 = conv(filters=out_channel)
 
@@ -62,15 +67,9 @@ class RRDBNet(tf.keras.Model):
     trunk = self.conv_trunk(self.rdb_trunk(feature))
     feature = trunk + feature
     feature = self.lrelu(
-        self.upsample1(
-            tf.nn.depth_to_space(
-                feature,
-                block_size=2)))
+        self.upsample1(feature))
     feature = self.lrelu(
-        self.upsample2(
-            tf.nn.depth_to_space(
-                feature,
-                block_size=2)))
+        self.upsample2(feature))
     feature = self.lrelu(self.conv_last_1(feature))
     out = self.conv_last_2(feature)
     return out
