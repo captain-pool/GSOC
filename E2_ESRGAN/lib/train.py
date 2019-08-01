@@ -35,7 +35,9 @@ class Trainer(object):
               method=dataset_args["scale_method"],
               dimension=dataset_args["hr_dimension"]),
           batch_size=settings["batch_size"],
-          data_dir=data_dir)
+          data_dir=data_dir,
+          augment=True,
+          shuffle=True)
     else:
       self.dataset = dataset.load_dataset_directory(
           dataset_args["name"],
@@ -43,7 +45,9 @@ class Trainer(object):
           dataset.scale_down(
               method=dataset_args["scale_method"],
               dimension=dataset_args["hr_dimension"]),
-          batch_size=settings["batch_size"])
+          batch_size=settings["batch_size"],
+          augment=True,
+          shuffle=True)
 
   def warmup_generator(self, generator):
     """ Training on L1 Loss to warmup the Generator.
@@ -81,8 +85,6 @@ class Trainer(object):
     start_time = time.time()
     # Training starts
     for epoch in range(1, self.iterations + 1):
-      metric.reset_states()
-      psnr_metric.reset_states()
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
         if warmup_num_iter and step % warmup_num_iter:

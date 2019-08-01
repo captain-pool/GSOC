@@ -5,7 +5,7 @@ checkpoint_path:
 dataset: 
   name: "coco2014"
   scale_method: "bicubic"
-  hr_dimension: 512
+  hr_dimension: 256
 
 print_step: 100
 
