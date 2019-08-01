@@ -54,7 +54,10 @@ class RRDBNet(tf.keras.Model):
       input_signature=[
           tf.TensorSpec(shape=[None, None, None, 3],
                         dtype=tf.float32)])
-  def call(self, input_):
+  def call(self, inputs):
+    return self.unsigned_call(inputs)
+  
+  def unsigned_call(self, input_):
     feature = self.conv_first(input_)
     trunk = self.conv_trunk(self.rdb_trunk(feature))
     feature = trunk + feature

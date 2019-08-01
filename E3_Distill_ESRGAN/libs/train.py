@@ -107,8 +107,8 @@ class Trainer(object):
           image_hr: Distributed Batch of High Resolution Images
       """
       with tf.GradientTape() as tape:
-        teacher_fake = self.teacher_generator(image_lr)
-        student_fake = student(image_lr)
+        teacher_fake = self.teacher_generator.unsigned_call(image_lr)
+        student_fake = student.unsigned_call(image_lr)
         psnr = tf.image.psnr(student_fake, image_hr, max_val=256.0)
         student_psnr(tf.reduce_mean(psnr) * (1.0 / self.batch_size))
         psnr = tf.image.psnr(teacher_fake, image_hr, max_val=256.0)
@@ -116,9 +116,10 @@ class Trainer(object):
         loss = loss_fn(teacher_fake, student_fake)
         loss = tf.reduce_mean(loss) * (1.0 / self.batch_size)
         metric_fn(loss)
-      gradient = tape.gradient(loss, student.trainable_variables)
+      student_vars = list(set(student_variables))
+      gradient = tape.gradient(loss, student_vars)
       train_op = optimizer.apply_gradients(
-          zip(gradient, student.trainable_variables))
+          zip(gradient, student_vars))
     @tf.function
     def train_step(image_lr, image_hr):
       """
@@ -202,10 +203,10 @@ class Trainer(object):
           image_hr: Distributed Batch of High Resolution Images
       """
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-        student_fake = student(image_lr)
+        student_fake = student.unsigned_call(image_lr)
         psnr = tf.image.psnr(image_hr, student_fake, max_val=255)
         student_psnr(psnr)
-        teacher_fake = self.teacher_generator(image_lr)
+        teacher_fake = self.teacher_generator.unsigned_call(image_lr)
         psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255)
         teacher_psnr(psnr)
         student_ra_loss = ra_generator(image_hr, student_fake)

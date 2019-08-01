@@ -41,13 +41,15 @@ class ResidualStudent(abstract.Model):
         conv_transpose(filters=32) for index in range(1, self._scale_factor)}
     self._last_layer = conv_transpose(filters=3)
 
-#  @tf.function(
-#      input_signature=[
-#          tf.TensorSpec(
-#              shape=[None, None, None, 3],  # 720x1080 Images
-#              dtype=tf.float32)])
-  @tf.function
+  @tf.function(
+      input_signature=[
+          tf.TensorSpec(
+              shape=[None, None, None, 3],  # 720x1080 Images
+              dtype=tf.float32)])
   def call(self, inputs):
+    return self.unsigned_call(inputs)
+
+  def usigned_call(self, inputs):
     intermediate = inputs
     for layer_name in self._conv_layers:
       intermediate += self._lrelu(self._conv_layers[layer_name](intermediate))
