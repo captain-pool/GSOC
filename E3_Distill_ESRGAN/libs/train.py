@@ -116,7 +116,7 @@ class Trainer(object):
         loss = loss_fn(teacher_fake, student_fake)
         loss = tf.reduce_mean(loss) * (1.0 / self.batch_size)
         metric_fn(loss)
-      student_vars = list(set(student_variables))
+      student_vars = list(set(student.trainable_variables))
       gradient = tape.gradient(loss, student_vars)
       train_op = optimizer.apply_gradients(
           zip(gradient, student_vars))

@@ -99,7 +99,7 @@ class RRDBStudent(abstract.Model):
   @tf.function(
       input_signature=[
           tf.TensorSpec(
-              shape=[None, None, None, 3],    # 720x1080 Images
+              shape=[None, 180, 270, 3],    # 720x1080 Images
               dtype=tf.float32)])
   def call(self, inputs):
     return self.unsigned_call(inputs)

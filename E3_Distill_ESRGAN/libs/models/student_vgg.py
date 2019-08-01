@@ -41,7 +41,7 @@ class VGGStudent(abstract.Model):
   @tf.function(
       input_signature=[
           tf.TensorSpec(
-              shape=[None, None, None, 3],  # For 720x1080 images
+              shape=[None, 180, 270, 3],  # For 720x1080 images
               dtype=tf.float32)])
   def call(self, inputs):
     return self.unsigned_call(self, inputs)

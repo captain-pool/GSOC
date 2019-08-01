@@ -44,12 +44,12 @@ class ResidualStudent(abstract.Model):
   @tf.function(
       input_signature=[
           tf.TensorSpec(
-              shape=[None, None, None, 3],  # 720x1080 Images
+              shape=[None, 180, 270, 3],  # 720x1080 Images
               dtype=tf.float32)])
   def call(self, inputs):
     return self.unsigned_call(inputs)
 
-  def usigned_call(self, inputs):
+  def unsigned_call(self, inputs):
     intermediate = inputs
     for layer_name in self._conv_layers:
       intermediate += self._lrelu(self._conv_layers[layer_name](intermediate))
