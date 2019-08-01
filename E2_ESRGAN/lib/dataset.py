@@ -16,14 +16,13 @@ def scale_down(method="bicubic", dimension=256, size=None, factor=4):
       Returns:
         tf.data.Dataset mappable python function based on the configuration.
   """
+  if not size:
+    size = (dimension, dimension)
   size_ = {"size": size}
   def scale_fn(image, *args, **kwargs):
     size = size_["size"]
     high_resolution = image
     if not kwargs.get("no_random_crop", None):
-      if not size:
-        size = (dimension, dimension)
-
       high_resolution = tf.image.random_crop(
           image, [size[0], size[1], image.shape[-1]])
 
@@ -34,7 +33,7 @@ def scale_down(method="bicubic", dimension=256, size=None, factor=4):
     low_resolution = tf.clip_by_value(low_resolution, 0, 255)
     high_resolution = tf.clip_by_value(high_resolution, 0, 255)
     return low_resolution, high_resolution
-  scale_fn.size = size
+  scale_fn.size = size_["size"]
   return scale_fn
 
 

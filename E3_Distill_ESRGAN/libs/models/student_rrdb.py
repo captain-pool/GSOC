@@ -96,12 +96,15 @@ class RRDBStudent(abstract.Model):
     self._conv_last = conv_transpose(filters=3)
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
 
-#  @tf.function(
-#      input_signature=[
-#          tf.TensorSpec(
-#              shape=[None, None, None, 3],    # 720x1080 Images
-#              dtype=tf.float32)])
+  @tf.function(
+      input_signature=[
+          tf.TensorSpec(
+              shape=[None, 180, 270, 3],    # 720x1080 Images
+              dtype=tf.float32)])
   def call(self, inputs):
+    return self.unsigned_call(inputs)
+
+  def unsigned_call(self, inputs):
     residual_start = self._first_conv(inputs)
     intermediate = residual_start + self._rrdb_trunk(residual_start)
     for layer_name in self._upsample_layers:

@@ -69,7 +69,7 @@ class Trainer(object):
       checkpoint = tf.train.Checkpoint(
           G=self.teacher_generator,
           D=self.teacher_discriminator)
-      utils.load_checkpoint(
+      self.__checkstat = utils.load_checkpoint(
           checkpoint,
           "phase_2",
           basepath=model_dir,
@@ -82,7 +82,8 @@ class Trainer(object):
       Args:
         student: Keras model of the student.
     """
-    tf.summary.experimental.set_step(tf.Variable(0, tf.int64))
+    if not tf.summary.experimental.get_step():
+      tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     optimizer = tf.optimizers.Adam()
     checkpoint = tf.train.Checkpoint(
         student_generator=student,
@@ -106,19 +107,19 @@ class Trainer(object):
           image_hr: Distributed Batch of High Resolution Images
       """
       with tf.GradientTape() as tape:
-        teacher_fake = self.teacher_generator(image_lr)
-        student_fake = student(image_lr)
-        psnr = tf.image.psnr(image_hr, student_fake, max_val=255.0)
-        student_psnr(psnr)
-        psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255.0)
-        teacher_psnr(psnr)
+        teacher_fake = self.teacher_generator.unsigned_call(image_lr)
+        student_fake = student.unsigned_call(image_lr)
+        psnr = tf.image.psnr(student_fake, image_hr, max_val=256.0)
+        student_psnr(tf.reduce_mean(psnr) * (1.0 / self.batch_size))
+        psnr = tf.image.psnr(teacher_fake, image_hr, max_val=256.0)
+        teacher_psnr(tf.reduce_mean(psnr) * (1.0 / self.batch_size))
         loss = loss_fn(teacher_fake, student_fake)
         loss = tf.reduce_mean(loss) * (1.0 / self.batch_size)
         metric_fn(loss)
-      gradient = tape.gradient(loss, student.trainable_variables)
+      student_vars = list(set(student.trainable_variables))
+      gradient = tape.gradient(loss, student_vars)
       train_op = optimizer.apply_gradients(
-          zip(gradient, student.trainable_variables))
-
+          zip(gradient, student_vars))
     @tf.function
     def train_step(image_lr, image_hr):
       """
@@ -135,7 +136,8 @@ class Trainer(object):
     for epoch in range(1, self.train_args["iterations"] + 1):
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
-        train_step(image_lr, image_hr)
+        x = train_step(image_lr, image_hr)
+        self.__checkstat.assert_consumed()
         if status:
           status.assert_consumed()
           logging.info("Checkpoint loaded successfully")
@@ -148,11 +150,11 @@ class Trainer(object):
           with self.summary_writer_2.as_default():
             tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
 
-        if step % self.train_args["print_step"]:
+        if not step % self.train_args["print_step"]:
           logging.info("[COMPARATIVE LOSS] Epoch: %d\tBatch: %d\tLoss: %f" %
                        (epoch, step // epoch, metric_fn.result()))
         # Saving Checkpoint
-        if step % self.train_args["checkpoint_step"]:
+        if not step % self.train_args["checkpoint_step"]:
           utils.save_checkpoint(
               checkpoint,
               "comparative_checkpoint",
@@ -201,10 +203,10 @@ class Trainer(object):
           image_hr: Distributed Batch of High Resolution Images
       """
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-        student_fake = student(image_lr)
+        student_fake = student.unsigned_call(image_lr)
         psnr = tf.image.psnr(image_hr, student_fake, max_val=255)
         student_psnr(psnr)
-        teacher_fake = self.teacher_generator(image_lr)
+        teacher_fake = self.teacher_generator.unsigned_call(image_lr)
         psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255)
         teacher_psnr(psnr)
         student_ra_loss = ra_generator(image_hr, student_fake)
@@ -247,6 +249,7 @@ class Trainer(object):
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
         train_step(image_lr, image_hr)
+        self.__checkstat.assert_consumed()
         if status:
           status.assert_consumed()
           status = None
@@ -264,13 +267,13 @@ class Trainer(object):
         if self.summary_writer_2:
           with self.summary_writer_2.as_default():
             tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
-        if step % self.train_args["print_step"]:
+        if not step % self.train_args["print_step"]:
           logging.info(
               "[ADVERSARIAL] Epoch: %d\tBatch: %d\tStudent Loss: %f" %
               (epoch, step // epoch, generator_metric.result()))
         step.assign_add(1)
         # Setting Up Checkpoint
-        if step % self.train_args["checkpoint_step"]:
+        if not step % self.train_args["checkpoint_step"]:
           utils.save_checkpoint(
               checkpoint,
               "adversarial_checkpoint",

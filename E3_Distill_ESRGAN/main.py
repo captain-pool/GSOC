@@ -80,7 +80,7 @@ def train_and_export(**kwargs):
         summary_writer,
         summary_writer_2=teacher_summary_writer,
         model_dir=kwargs["modeldir"],
-        data_dir=kwargs["data_dir"],
+        data_dir=kwargs["datadir"],
         strategy=strategy)
 
     if kwargs["type"].lower().startswith("comparative"):
@@ -89,11 +89,14 @@ def train_and_export(**kwargs):
     elif kwargs["type"].lower().startswith("adversarial"):
       trainer.train_adversarial(student_generator)
       stats["adversarial"] = True
-  #  tf.saved_model.save(
-  #      student_generator,
-  #      os.path.join(
-  #          kwargs["modeldir"],
-  #          "compressed_esrgan"))
+  # Tracing Graph to put input signature
+  _ = student_generator(
+      tf.random.normal([None, 180, 270, 3]))
+  tf.saved_model.save(
+      student_generator,
+      os.path.join(
+          kwargs["modeldir"],
+          "compressed_esrgan"))
 
 
 if __name__ == "__main__":
