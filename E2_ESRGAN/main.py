@@ -47,8 +47,8 @@ def main(**kwargs):
   strategy = utils.SingleDeviceStrategy()
   scope = utils.assign_to_worker(kwargs["tpu"])
   if kwargs["tpu"]:
-    cluster_resolver = tf.distribute.experimental.TPUClusterResolver(kwargs["tpu"])
-    tf.config.experimental_connect_to_host(cluster_resolver.master())
+    cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(kwargs["tpu"])
+    tf.config.experimental_connect_to_host(cluster_resolver.get_master())
     tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
     strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
   with tf.device(scope), strategy.scope():
