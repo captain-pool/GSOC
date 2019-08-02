@@ -111,7 +111,7 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
     y_true = tf.cast(y_true, tf.float32)
     y_pred = tf.cast(y_pred, tf.float32)
     if loss_type.lower() == "l1":
-      return tf.reduce_mean(tf.abs(y_true - y_pred))
+      return tf.reduce_mean(tf.abs(phi(y_true) - phi(y_pred)))
     if loss_type.lower() == "l2":
       return tf.keras.losses.MSE(phi(y_true), phi(y_pred))
     raise ValueError(
