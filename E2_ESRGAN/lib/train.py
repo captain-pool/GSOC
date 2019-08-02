@@ -15,7 +15,8 @@ class Trainer(object):
           settings,
           model_dir="",
           data_dir=None,
-          manual=False):
+          manual=False,
+          strategy=None):
     """ Setup the values and variables for Training.
         Args:
           summary_writer: tf.summary.SummaryWriter object to write summaries for Tensorboard.
@@ -27,27 +28,35 @@ class Trainer(object):
     self.model_dir = model_dir
     self.summary_writer = summary_writer
     self.iterations = self.settings["iterations"]
+    self.strategy = strategy
     dataset_args = self.settings["dataset"]
-    if not manual:
-      self.dataset = dataset.load_dataset(
-          dataset_args["name"],
-          dataset.scale_down(
-              method=dataset_args["scale_method"],
-              dimension=dataset_args["hr_dimension"]),
-          batch_size=settings["batch_size"],
-          data_dir=data_dir,
-          augment=True,
-          shuffle=True)
+    if isinstance(strategy, tf.distribute.Strategy):
+      self.dataset = dataset.load_tfrecord_dataset(
+          tfrecord_path=data_dir,
+          lr_size=dataset_args["hr_dimension"],
+          hr_size=dataset_args["hr_dimension"])
+      self.dataset = strategy.experimental_distribute_distribute(self.dataset)
     else:
-      self.dataset = dataset.load_dataset_directory(
-          dataset_args["name"],
-          data_dir,
-          dataset.scale_down(
-              method=dataset_args["scale_method"],
-              dimension=dataset_args["hr_dimension"]),
-          batch_size=settings["batch_size"],
-          augment=True,
-          shuffle=True)
+      if not manual:
+        self.dataset = dataset.load_dataset(
+            dataset_args["name"],
+            dataset.scale_down(
+                method=dataset_args["scale_method"],
+                dimension=dataset_args["hr_dimension"]),
+            batch_size=settings["batch_size"],
+            data_dir=data_dir,
+            augment=True,
+            shuffle=True)
+      else:
+        self.dataset = dataset.load_dataset_directory(
+            dataset_args["name"],
+            data_dir,
+            dataset.scale_down(
+                method=dataset_args["scale_method"],
+                dimension=dataset_args["hr_dimension"]),
+            batch_size=settings["batch_size"],
+            augment=True,
+            shuffle=True)
 
   def warmup_generator(self, generator):
     """ Training on L1 Loss to warmup the Generator.
@@ -84,26 +93,34 @@ class Trainer(object):
     previous_loss = float("inf")
     start_time = time.time()
     # Training starts
+    @tf.function
+    def _step_fn(image_lr, image_hr):
+      with tf.GradientTape() as tape:
+        fake = generator.unsigned_call(image_lr)
+        loss = utils.pixel_loss(image_hr, fake)
+      psnr_metric(
+          tf.reduce_mean(
+              tf.image.psnr(
+                  fake,
+                  image_hr,
+                  max_val=256.0)))
+      gen_vars = list(set(generator.trainable_variables))
+      gradient = tape.gradient(loss, gen_vars)
+      G_optimizer.apply_gradients(
+          zip(gradient, gen_vars))
+      mean_loss = metric(loss)
+    def train_step(image_lr, image_hr):
+      self.strategy.experimental_run_v2(_step_fn, args=[image_lr, image_hr])
+
     for epoch in range(1, self.iterations + 1):
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
         if warmup_num_iter and step % warmup_num_iter:
           return
-
-        with tf.GradientTape() as tape:
-          fake = generator(image_lr)
-          loss = utils.pixel_loss(image_hr, fake)
-        psnr = psnr_metric(
-            tf.reduce_mean(
-                tf.image.psnr(
-                    fake,
-                    image_hr,
-                    max_val=256.0)))
-        gradient = tape.gradient(loss, generator.trainable_variables)
-        G_optimizer.apply_gradients(
-            zip(gradient, generator.trainable_variables))
-        mean_loss = metric(loss)
-
+        if isinstance(self.strategy, tf.distribute.Strategy):
+          train_step(image_lr, image_hr)
+        else:
+          _step_fn(image_lr, image_hr)
         if status:
           status.assert_consumed()
           logging.info(
@@ -126,13 +143,6 @@ class Trainer(object):
           step.assign_add(1)
 
         if not step % self.settings["print_step"]:
-          with self.summary_writer.as_default():
-            tf.summary.image("fake_image", tf.cast(tf.clip_by_value(
-                fake[:1], 0, 255), tf.uint8), step=step)
-            tf.summary.image("hr_image",
-                             tf.cast(image_hr[:1], tf.uint8),
-                             step=step)
-
           logging.info(
               "[WARMUP] Epoch: {}\tBatch: {}\tGenerator Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
                   epoch,

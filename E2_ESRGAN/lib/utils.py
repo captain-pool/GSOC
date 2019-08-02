@@ -176,6 +176,21 @@ def RelativisticAverageLoss(non_transformed_disc, type_="G"):
   return loss
 
 
+# Strategy Utils
+
+def assign_to_worker(use_tpu):
+  if use_tpu:
+    return "/job:worker"
+  return ""
+
+class SingleDeviceStrategy(object):
+  """ Dummy Strategy when Outside TPU """
+  def __init__(self, *args, **kwargs):
+    pass
+  def __exit__(self):
+    pass
+
+# Model Utils
 class RDB(tf.keras.layers.Layer):
   """ Residual Dense Block Layer """
 
