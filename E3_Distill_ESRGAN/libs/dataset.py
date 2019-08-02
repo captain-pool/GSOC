@@ -9,7 +9,8 @@ def generate_tf_record(
         dataset_name,
         data_dir,
         raw_data=False,
-        tfrecord_path="serialized_dataset"):
+        tfrecord_path="serialized_dataset",
+        num_shards=8):
 
   teacher_sett = settings.Settings(use_student_settings=False)
   student_sett = settings.Settings(use_student_settings=True)
@@ -28,7 +29,7 @@ def generate_tf_record(
             method=dataset_args["scale_method"],
             size=student_sett["hr_size"]),
         data_dir=data_dir)
-  to_tfrecord(ds, tfrecord_path)
+  to_tfrecord(ds, tfrecord_path, num_shards)
 
 
 def load_dataset(tfrecord_path, lr_size, hr_size):
@@ -74,7 +75,8 @@ def to_tfrecord(ds, tfrecord_path, NUM_SHARDS=8):
 
   def write_to_tfrecord(shard_id, ds):
     filename = tf.strings.join(
-        [tfrecord_path, "/dataset.", tf.strings.as_string(shard_id), ".tfrecord"])
+            [tfrecord_path, "/dataset.", tf.strings.as_string(shard_id),
+                ".tfrecord"])
     writer = tf.data.experimental.TFRecordWriter(filename)
     writer.write(ds.map(lambda _, x: x))
     return tf.data.Dataset.from_tensors(filename)

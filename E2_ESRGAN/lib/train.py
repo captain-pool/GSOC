@@ -15,7 +15,8 @@ class Trainer(object):
           settings,
           model_dir="",
           data_dir=None,
-          manual=False):
+          manual=False,
+          strategy=None):
     """ Setup the values and variables for Training.
         Args:
           summary_writer: tf.summary.SummaryWriter object to write summaries for Tensorboard.
@@ -27,27 +28,42 @@ class Trainer(object):
     self.model_dir = model_dir
     self.summary_writer = summary_writer
     self.iterations = self.settings["iterations"]
+    self.strategy = strategy
     dataset_args = self.settings["dataset"]
-    if not manual:
-      self.dataset = dataset.load_dataset(
-          dataset_args["name"],
-          dataset.scale_down(
-              method=dataset_args["scale_method"],
-              dimension=dataset_args["hr_dimension"]),
-          batch_size=settings["batch_size"],
-          data_dir=data_dir,
-          augment=True,
-          shuffle=True)
+    self.batch_size = self.settings["batch_size"]
+    hr_size = tf.convert_to_tensor(
+        [dataset_args["hr_dimension"],
+        dataset_args["hr_dimension"], 3])
+
+    lr_size = tf.cast(hr_size, tf.float32) * tf.convert_to_tensor([1/4, 1/4, 1], tf.float32)
+    lr_size = tf.cast(lr_size, tf.int32)
+    if isinstance(strategy, tf.distribute.Strategy):
+      self.dataset = dataset.load_tfrecord_dataset(
+          tfrecord_path=data_dir,
+          lr_size=lr_size,
+          hr_size=hr_size).batch(self.batch_size).prefetch(1024)
+      self.dataset = strategy.experimental_distribute_dataset(self.dataset)
     else:
-      self.dataset = dataset.load_dataset_directory(
-          dataset_args["name"],
-          data_dir,
-          dataset.scale_down(
-              method=dataset_args["scale_method"],
-              dimension=dataset_args["hr_dimension"]),
-          batch_size=settings["batch_size"],
-          augment=True,
-          shuffle=True)
+      if not manual:
+        self.dataset = dataset.load_dataset(
+            dataset_args["name"],
+            dataset.scale_down(
+                method=dataset_args["scale_method"],
+                dimension=dataset_args["hr_dimension"]),
+            batch_size=settings["batch_size"],
+            data_dir=data_dir,
+            augment=True,
+            shuffle=True)
+      else:
+        self.dataset = dataset.load_dataset_directory(
+            dataset_args["name"],
+            data_dir,
+            dataset.scale_down(
+                method=dataset_args["scale_method"],
+                dimension=dataset_args["hr_dimension"]),
+            batch_size=settings["batch_size"],
+            augment=True,
+            shuffle=True)
 
   def warmup_generator(self, generator):
     """ Training on L1 Loss to warmup the Generator.
@@ -84,26 +100,33 @@ class Trainer(object):
     previous_loss = float("inf")
     start_time = time.time()
     # Training starts
+
+    def _step_fn(image_lr, image_hr):
+      with tf.GradientTape() as tape:
+        fake = generator.unsigned_call(image_lr)
+        loss = utils.pixel_loss(image_hr, fake) * (1.0 / self.batch_size)
+      psnr_metric(
+          tf.reduce_mean(
+              tf.image.psnr(
+                  fake,
+                  image_hr,
+                  max_val=256.0)))
+      gen_vars = list(set(generator.trainable_variables))
+      gradient = tape.gradient(loss, gen_vars)
+      G_optimizer.apply_gradients(
+          zip(gradient, gen_vars))
+      mean_loss = metric(loss)
+
+    @tf.function
+    def train_step(image_lr, image_hr):
+      self.strategy.experimental_run_v2(_step_fn, args=[image_lr, image_hr])
+
     for epoch in range(1, self.iterations + 1):
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
         if warmup_num_iter and step % warmup_num_iter:
           return
-
-        with tf.GradientTape() as tape:
-          fake = generator(image_lr)
-          loss = utils.pixel_loss(image_hr, fake)
-        psnr = psnr_metric(
-            tf.reduce_mean(
-                tf.image.psnr(
-                    fake,
-                    image_hr,
-                    max_val=256.0)))
-        gradient = tape.gradient(loss, generator.trainable_variables)
-        G_optimizer.apply_gradients(
-            zip(gradient, generator.trainable_variables))
-        mean_loss = metric(loss)
-
+        train_step(image_lr, image_hr)
         if status:
           status.assert_consumed()
           logging.info(
@@ -112,39 +135,32 @@ class Trainer(object):
 
         if not step % decay_step and step:  # Decay Learning Rate
           logging.debug(
-              "Learning Rate: %f" %
-              G_optimizer.learning_rate.numpy())
+              "Learning Rate: %s" %
+              G_optimizer.learning_rate.numpy)
           G_optimizer.learning_rate.assign(
               G_optimizer.learning_rate * decay_factor)
           logging.debug(
-              "Decayed Learning Rate by %f. Current Learning Rate %f" % (
-                  decay_factor, G_optimizer.learning_rate.numpy()))
+              "Decayed Learning Rate by %f. Current Learning Rate %s" % (
+                  decay_factor, G_optimizer.learning_rate))
         with self.summary_writer.as_default():
           tf.summary.scalar(
-              "warmup_loss", mean_loss, step=step)
-          tf.summary.scalar("mean_psnr", psnr, step=step)
+              "warmup_loss", metric.result(), step=step)
+          tf.summary.scalar("mean_psnr", psnr_metric.result(), step=step)
           step.assign_add(1)
 
         if not step % self.settings["print_step"]:
-          with self.summary_writer.as_default():
-            tf.summary.image("fake_image", tf.cast(tf.clip_by_value(
-                fake[:1], 0, 255), tf.uint8), step=step)
-            tf.summary.image("hr_image",
-                             tf.cast(image_hr[:1], tf.uint8),
-                             step=step)
-
           logging.info(
               "[WARMUP] Epoch: {}\tBatch: {}\tGenerator Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
                   epoch,
                   step //
                   epoch,
-                  mean_loss.numpy(),
-                  psnr.numpy(),
+                  metric,
+                  psnr_metric,
                   time.time() -
                   start_time))
-          if mean_loss < previous_loss:
+          if metric.result() < previous_loss:
             utils.save_checkpoint(checkpoint, "phase_1", self.model_dir)
-          previous_loss = mean_loss
+          previous_loss = metric.result()
           start_time = time.time()
 
   def train_gan(self, generator, discriminator):
@@ -211,40 +227,48 @@ class Trainer(object):
         weights="imagenet",
         input_shape=[hr_dimension, hr_dimension, 3],
         loss_type=phase_args["perceptual_loss_type"])
+
+    def _step_fn(image_lr, image_hr):
+      with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
+        fake = generator.unsigned_call(image_lr)
+        percep_loss = perceptual_loss(image_hr, fake)
+        l1_loss = utils.pixel_loss(image_hr, fake)
+        loss_RaG = ra_gen(image_hr, fake)
+        disc_loss = ra_disc(image_hr, fake)
+        gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
+        gen_loss = gen_loss * (1.0 / self.batch_size)
+        disc_loss = disc_loss * (1.0 / self.batch_size)
+        disc_metric(disc_loss)
+        gen_metric(gen_loss)
+      psnr = psnr_metric(
+          tf.reduce_mean(
+              tf.image.psnr(
+                  fake,
+                  image_hr,
+                  max_val=256.0)))
+      gen_vars = list(set(generator.trainable_variables))
+      disc_vars = list(set(discriminator.trainable_variables))
+      disc_grad = disc_tape.gradient(
+          disc_loss, disc_vars)
+      gen_grad = gen_tape.gradient(
+          gen_loss, gen_vars)
+      G_optimizer.apply_gradients(
+          zip(gen_grad, gen_vars))     
+      D_optimizer.apply_gradients(
+          zip(disc_grad, disc_vars))
+
+
+    @tf.function
+    def train_step(image_lr, image_hr):
+
+      self.strategy.experimental_run_v2(_step_fn, args=(image_lr, image_hr))
+
     for epoch in range(1, self.iterations + 1):
       # Resetting Metrics
-      gen_metric.reset_states()
-      disc_metric.reset_states()
-      psnr_metric.reset_states()
       start = time.time()
       for (image_lr, image_hr) in self.dataset:
         step = tf.summary.experimental.get_step()
-
-       # Calculating Loss applying gradients
-        with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-          fake = generator(image_lr)
-          percep_loss = perceptual_loss(image_hr, fake)
-          l1_loss = utils.pixel_loss(image_hr, fake)
-          loss_RaG = ra_gen(image_hr, fake)
-          disc_loss = ra_disc(image_hr, fake)
-          gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
-          disc_metric(disc_loss)
-          gen_metric(gen_loss)
-        psnr = psnr_metric(
-            tf.reduce_mean(
-                tf.image.psnr(
-                    fake,
-                    image_hr,
-                    max_val=256.0)))
-        disc_grad = disc_tape.gradient(
-            disc_loss, discriminator.trainable_variables)
-        gen_grad = gen_tape.gradient(
-            gen_loss, generator.trainable_variables)
-        D_optimizer.apply_gradients(
-            zip(disc_grad, discriminator.trainable_variables))
-        G_optimizer.apply_gradients(
-            zip(gen_grad, generator.trainable_variables))
-
+        train_step(image_lr, image_hr)
         if status:
           status.assert_consumed()
           logging.info("consumed checkpoint successfully!")
@@ -267,27 +291,16 @@ class Trainer(object):
               "gen_loss", gen_metric.result(), step=step)
           tf.summary.scalar(
               "disc_loss", disc_metric.result(), step=step)
-          tf.summary.scalar("mean_psnr", psnr, step=step)
+          tf.summary.scalar("mean_psnr", psnr_metric.result(), step=step)
           step.assign_add(1)
 
         # Logging and Checkpointing
         if not step % self.settings["print_step"]:
-          with self.summary_writer.as_default():
-            resized_lr = tf.cast(tf.clip_by_value(tf.image.resize(
-                image_lr[:1],
-                [hr_dimension, hr_dimension],
-                method=self.settings["dataset"]["scale_method"]), 0, 255), tf.uint8)
-            tf.summary.image("lr_image", resized_lr, step=step)
-            tf.summary.image("fake_image", tf.cast(tf.clip_by_value(
-                fake[:1], 0, 255), tf.uint8), step=step)
-            tf.summary.image("hr_image",
-                             tf.cast(image_hr[:1], tf.uint8),
-                             step=step)
           logging.info(
               "Epoch: {}\tBatch: {}\tGen Loss: {}\tDisc Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
-                  (epoch + 1), step.numpy() // (epoch + 1),
-                  gen_metric.result().numpy(),
-                  disc_metric.result().numpy(), psnr.numpy(),
+                  (epoch + 1), step // (epoch + 1),
+                  gen_metric.result(),
+                  disc_metric.result(), psnr_metric,
                   time.time() - start))
           utils.save_checkpoint(checkpoint, "phase_2", self.model_dir)
           start = time.time()

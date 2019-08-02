@@ -1,3 +1,4 @@
+import os
 from absl import logging
 from functools import partial
 import tensorflow as tf
@@ -251,3 +252,29 @@ def load_dataset(
             saturation=None),
         num_parallel_calls=tf.data.experimental.AUTOTUNE)
   return dataset
+
+def load_tfrecord_dataset(tfrecord_path, lr_size, hr_size):
+  def _parse_tf_record(serialized_example):
+    features = {
+        "low_res_image": tf.io.FixedLenFeature([], dtype=tf.string),
+        "high_res_image": tf.io.FixedLenFeature([], dtype=tf.string)}
+    example = tf.io.parse_single_example(serialized_example, features)
+    lr_image = tf.io.parse_tensor(
+        example["low_res_image"],
+        out_type=tf.float32)
+    lr_image = tf.reshape(lr_image, lr_size)
+    hr_image = tf.io.parse_tensor(
+        example["high_res_image"],
+        out_type=tf.float32)
+    hr_image = tf.reshape(hr_image, hr_size)
+    return lr_image, hr_image
+  files = tf.io.gfile.glob(
+          os.path.join(tfrecord_path, "*.tfrecord"))
+  if len(files) == 0:
+    raise ValueError("Path Doesn't contain any file")
+  ds = tf.data.TFRecordDataset(files).map(_parse_tf_record)
+  if len(files) == 1:
+    option = tf.data.Options()
+    option.auto_shard = False
+    ds.with_options(ds)
+  return ds
