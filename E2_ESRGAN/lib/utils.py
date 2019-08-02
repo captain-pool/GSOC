@@ -183,12 +183,20 @@ def assign_to_worker(use_tpu):
     return "/job:worker"
   return ""
 
-class SingleDeviceStrategy(object):
-  """ Dummy Strategy when Outside TPU """
-  def __init__(self, *args, **kwargs):
+class _DummyStrategy(object):
+  def __enter__(self):
     pass
   def __exit__(self):
     pass
+
+class SingleDeviceStrategy(object):
+  """ Dummy Strategy when Outside TPU """
+
+  def scope(self):
+    return _DummyStrategy()
+
+  def experimental_run_v2(self, fn, args, kwargs):
+    return fn(*args, **kwargs)
 
 # Model Utils
 class RDB(tf.keras.layers.Layer):

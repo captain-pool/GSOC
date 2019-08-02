@@ -93,7 +93,7 @@ class Trainer(object):
     previous_loss = float("inf")
     start_time = time.time()
     # Training starts
-    @tf.function
+
     def _step_fn(image_lr, image_hr):
       with tf.GradientTape() as tape:
         fake = generator.unsigned_call(image_lr)
@@ -109,6 +109,8 @@ class Trainer(object):
       G_optimizer.apply_gradients(
           zip(gradient, gen_vars))
       mean_loss = metric(loss)
+
+    @tf.function
     def train_step(image_lr, image_hr):
       self.strategy.experimental_run_v2(_step_fn, args=[image_lr, image_hr])
 
@@ -221,40 +223,43 @@ class Trainer(object):
         weights="imagenet",
         input_shape=[hr_dimension, hr_dimension, 3],
         loss_type=phase_args["perceptual_loss_type"])
+
+    def _step_fn(image_lr, image_hr):
+      with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
+        fake = generator(image_lr)
+        percep_loss = perceptual_loss(image_hr, fake)
+        l1_loss = utils.pixel_loss(image_hr, fake)
+        loss_RaG = ra_gen(image_hr, fake)
+        disc_loss = ra_disc(image_hr, fake)
+        gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
+        disc_metric(disc_loss)
+        gen_metric(gen_loss)
+      psnr = psnr_metric(
+          tf.reduce_mean(
+              tf.image.psnr(
+                  fake,
+                  image_hr,
+                  max_val=256.0)))
+      disc_grad = disc_tape.gradient(
+          disc_loss, discriminator.trainable_variables)
+      gen_grad = gen_tape.gradient(
+          gen_loss, generator.trainable_variables)
+      D_optimizer.apply_gradients(
+          zip(disc_grad, discriminator.trainable_variables))
+      G_optimizer.apply_gradients(
+          zip(gen_grad, generator.trainable_variables))
+
+    @tf.function
+    def train_step(image_lr, image_hr):
+
+      self.strategy.experimental_run_v2(_step_fn, args=(image_lr, image_hr))
+
     for epoch in range(1, self.iterations + 1):
       # Resetting Metrics
-      gen_metric.reset_states()
-      disc_metric.reset_states()
-      psnr_metric.reset_states()
       start = time.time()
       for (image_lr, image_hr) in self.dataset:
         step = tf.summary.experimental.get_step()
-
-       # Calculating Loss applying gradients
-        with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-          fake = generator(image_lr)
-          percep_loss = perceptual_loss(image_hr, fake)
-          l1_loss = utils.pixel_loss(image_hr, fake)
-          loss_RaG = ra_gen(image_hr, fake)
-          disc_loss = ra_disc(image_hr, fake)
-          gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
-          disc_metric(disc_loss)
-          gen_metric(gen_loss)
-        psnr = psnr_metric(
-            tf.reduce_mean(
-                tf.image.psnr(
-                    fake,
-                    image_hr,
-                    max_val=256.0)))
-        disc_grad = disc_tape.gradient(
-            disc_loss, discriminator.trainable_variables)
-        gen_grad = gen_tape.gradient(
-            gen_loss, generator.trainable_variables)
-        D_optimizer.apply_gradients(
-            zip(disc_grad, discriminator.trainable_variables))
-        G_optimizer.apply_gradients(
-            zip(gen_grad, generator.trainable_variables))
-
+        train_step(image_lr, image_hr)
         if status:
           status.assert_consumed()
           logging.info("consumed checkpoint successfully!")
