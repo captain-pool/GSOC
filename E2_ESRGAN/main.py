@@ -57,7 +57,7 @@ def main(**kwargs):
     summary_writer = tf.summary.create_file_writer(kwargs["log_dir"])
     # profiler.start_profiler_server(6009)
     generator = model.RRDBNet(out_channel=3)
-    discriminator = model.VGGArch()
+    discriminator = model.VGGArch(batch_size=sett["batch_size"])
     training = train.Trainer(
         summary_writer=summary_writer,
         settings=sett,
