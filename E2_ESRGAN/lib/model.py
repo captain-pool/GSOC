@@ -86,25 +86,26 @@ class VGGArch(tf.keras.Model):
 
   """
 
-  def __init__(self, output_shape=1, num_features=64, use_bias=True):
+  def __init__(self, batch_size=8, output_shape=1, num_features=64, use_bias=True):
 
     super(VGGArch, self).__init__()
     conv = partial(
         tf.keras.layers.Conv2D,
         kernel_size=[3, 3], use_bias=use_bias, padding="same")
     batch_norm = partial(tf.keras.layers.BatchNormalization)
-    self._lrelu = lambda x: tf.keras.layers.LeakyReLU(alpha=0.2)(x)
+    no_batch_norm = lambda x: x
+    self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self._dense_1 = tf.keras.layers.Dense(1024)
     self._dense_2 = tf.keras.layers.Dense(output_shape)
     self._conv_layers = OrderedDict()
     self._batch_norm = OrderedDict()
     self._conv_layers["conv_0_0"] = conv(filters=num_features, strides=1)
     self._conv_layers["conv_0_1"] = conv(filters=num_features, strides=2)
-    self._batch_norm["bn_0_1"] = batch_norm()
+    self._batch_norm["bn_0_1"] = no_batch_norm if batch_size < 256 else batch_norm()
     for i in range(1, 4):
       for j in range(1, 3):
         self._conv_layers["conv_%d_%d" % (i, j)] = conv(filters=2**i*num_features, strides=j)
-        self._batch_norm["bn_%d_%d" % (i, j)] = batch_norm()
+        self._batch_norm["bn_%d_%d" % (i, j)] = no_batch_norm if batch_size < 256 else batch_norm()
   def call(self, input_):
 
     features = self._lrelu(self._conv_layers["conv_0_0"](input_))

@@ -72,7 +72,8 @@ def train_and_export(**kwargs):
         .models[student_settings["student_network"]]())
 
     teacher_generator = teacher.generator(out_channel=3)
-    teacher_discriminator = teacher.discriminator()
+    teacher_discriminator = teacher.discriminator(
+        batch_size=teacher_settings["batch_size"])
 
     trainer = train.Trainer(
         teacher_generator,
