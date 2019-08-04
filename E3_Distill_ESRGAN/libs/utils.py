@@ -31,7 +31,7 @@ def save_checkpoint(checkpoint, name, basepath="", use_student_settings=False):
         student: boolean to indicate if settings of the student should be used.
   """
   sett = settings.Settings(use_student_settings=use_student_settings)
-  dir_ = os.path.join(basepath, sett["checkpoint_path"][name], "checkpoint")
+  dir_ = os.path.join(basepath, sett["checkpoint_path"][name])
   logging.info("Saving checkpoint: %s Path: %s" % (name, dir_))
   prefix = os.path.join(dir_, os.path.basename(dir_))
   checkpoint.save(file_prefix=prefix)
@@ -46,8 +46,8 @@ def load_checkpoint(checkpoint, name, basepath="", use_student_settings=False):
         student: boolean to indicate if settings of the student should be used.
   """
   sett = settings.Settings(use_student_settings=use_student_settings)
-  dir_ = os.path.join(basepath, sett["checkpoint_path"][name], "checkpoint")
-  if tf.io.gfile.exists(dir_):
+  dir_ = os.path.join(basepath, sett["checkpoint_path"][name])
+  if tf.io.gfile.exists(os.path.join(dir_, "checkpoint")):
     logging.info("Found checkpoint: %s Path: %s" % (name, dir_))
     status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
     return status
