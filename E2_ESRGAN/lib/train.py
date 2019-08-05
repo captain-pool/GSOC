@@ -41,7 +41,7 @@ class Trainer(object):
       self.dataset = dataset.load_tfrecord_dataset(
           tfrecord_path=data_dir,
           lr_size=lr_size,
-          hr_size=hr_size).batch(self.batch_size)
+          hr_size=hr_size).batch(self.batch_size, drop_remainder=True)
       self.dataset = strategy.experimental_distribute_dataset(self.dataset)
     else:
       if not manual:
