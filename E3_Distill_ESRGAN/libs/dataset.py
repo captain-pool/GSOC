@@ -21,14 +21,16 @@ def generate_tf_record(
         data_dir,
         dataset.scale_down(
             method=dataset_args["scale_method"],
-            size=student_sett["hr_size"]))
+            size=student_sett["hr_size"]),
+        num_elems=65536)
   else:
     ds = dataset.load_dataset(
         dataset_args["name"],
         dataset.scale_down(
             method=dataset_args["scale_method"],
             size=student_sett["hr_size"]),
-        data_dir=data_dir)
+        data_dir=data_dir,
+        num_elems=65536)
   to_tfrecord(ds, tfrecord_path, num_shards)
 
 
