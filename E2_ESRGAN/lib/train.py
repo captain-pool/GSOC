@@ -203,9 +203,8 @@ class Trainer(object):
     if not tf.io.gfile.exists(
         os.path.join(
             self.model_dir,
-            os.path.join(
             self.settings["checkpoint_path"]["phase_2"],
-            "checkpoint"))):
+            "checkpoint")):
       hot_start = tf.train.Checkpoint(
           G=generator,
           G_optimizer=G_optimizer,
@@ -229,6 +228,7 @@ class Trainer(object):
         loss_type=phase_args["perceptual_loss_type"])
 
     def _step_fn(image_lr, image_hr):
+      tf.print(image_lr.shape, image_hr.shape)
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         fake = generator.unsigned_call(image_lr)
         percep_loss = perceptual_loss(image_hr, fake)
@@ -260,24 +260,31 @@ class Trainer(object):
 
     @tf.function
     def train_step(image_lr, image_hr):
-
       self.strategy.experimental_run_v2(_step_fn, args=(image_lr, image_hr))
+      num_steps = self.strategy.reduce(tf.distribute.ReduceOp.MEAN,G_optimizer.iterations, axis=None)
+      return  num_steps
 
     for epoch in range(1, self.iterations + 1):
       # Resetting Metrics
       start = time.time()
       for (image_lr, image_hr) in self.dataset:
         step = tf.summary.experimental.get_step()
-        train_step(image_lr, image_hr)
+        num_step = train_step(image_lr, image_hr)
         if status:
           status.assert_consumed()
           logging.info("consumed checkpoint successfully!")
           status = None
-
         # Decaying Learning Rate
         for _step in decay_steps.copy():
-          if (step - 1) >= _step:
+          if (num_step - 1) >= _step:
             decay_steps.pop()
+            g_current_lr = self.strategy.reduce(
+                tf.distribute.ReduceOp.MEAN,
+                G_optimizer.learning_rate)
+            d_current_lr = self.strategy.reduce(
+                tf.distribute.ReduceOp.MEAN,
+                D_optimizer.learning_rate)
+            logging.debug("Current LR: G = %s, D = %s" % (g_current_lr, d_current_lr))
             logging.debug(
                 "[Phase 2] Decayed Learing Rate by %f." % decay_factor)
             G_optimizer.learning_rate.assign(
@@ -297,10 +304,10 @@ class Trainer(object):
         # Logging and Checkpointing
         if not step % self.settings["print_step"]:
           logging.info(
-              "Epoch: {}\tBatch: {}\tGen Loss: {}\tDisc Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
-                  (epoch + 1), step // (epoch + 1),
+              "Epoch: {}\tGen Loss: {}\tDisc Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
+                  (epoch + 1),
                   gen_metric.result(),
-                  disc_metric.result(), psnr_metric,
+                  disc_metric.result(), psnr_metric.result(),
                   time.time() - start))
           utils.save_checkpoint(checkpoint, "phase_2", self.model_dir)
           start = time.time()
