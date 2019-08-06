@@ -285,4 +285,4 @@ def load_tfrecord_dataset(tfrecord_path, lr_size, hr_size):
     option = tf.data.Options()
     option.auto_shard = False
     ds.with_options(ds)
-  return ds
+  return ds.shuffle(128, reshuffle_each_iteration=True)
