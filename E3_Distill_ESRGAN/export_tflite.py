@@ -66,4 +66,4 @@ if __name__ == "__main__":
   FLAGS, unknown = parser.parse_known_args()
   log_level = log_levels[min(FLAGS.verbose, len(log_levels) - 1)]
   logging.set_verbosity(log_level)
-    export_tflite(**vars(FLAGS))
+  export_tflite(**vars(FLAGS))

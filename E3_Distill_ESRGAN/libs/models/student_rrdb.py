@@ -6,6 +6,7 @@ from libs import settings
 import tensorflow as tf
 from absl import logging
 
+
 class ResidualDenseBlock(tf.keras.layers.Layer):
   """
     Keras implmentation of Residual Dense Block.

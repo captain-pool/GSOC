@@ -15,10 +15,10 @@ interpolation_parameter: 0.8 # Interpolation parameter: 0 <= value <= 1
 RDB:
   residual_scale_beta: 0.2
 #Training
-# warmup_num_iter: 1000 # Number of steps to train the PSNR model
 batch_size: 64
 iterations: 4
 train_psnr:
+  num_steps: 20000
   adam:
     initial_lr: 0.002 # Theory 0.0002
     decay:

@@ -31,6 +31,7 @@ import tensorflow as tf
       }
 """
 
+
 def main(**kwargs):
   """ Main function for training ESRGAN model and exporting it as a SavedModel2.0
       Args:
@@ -43,11 +44,12 @@ def main(**kwargs):
 
   for physical_device in tf.config.experimental.list_physical_devices("GPU"):
     tf.config.experimental.set_memory_growth(physical_device, True)
-  
+
   strategy = utils.SingleDeviceStrategy()
   scope = utils.assign_to_worker(kwargs["tpu"])
   if kwargs["tpu"]:
-    cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(kwargs["tpu"])
+    cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
+        kwargs["tpu"])
     tf.config.experimental_connect_to_host(cluster_resolver.get_master())
     tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
     strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
@@ -84,7 +86,9 @@ def main(**kwargs):
           discriminator,
           sett["interpolation_parameter"],
           sett["dataset"]["hr_dimension"])
-      tf.saved_model.save(interpolated_generator, os.path.join(kwargs["model_dir"], "esrgan"))
+      tf.saved_model.save(
+          interpolated_generator, os.path.join(
+              kwargs["model_dir"], "esrgan"))
 
 
 if __name__ == '__main__':
