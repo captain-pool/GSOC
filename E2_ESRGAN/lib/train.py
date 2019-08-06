@@ -41,7 +41,7 @@ class Trainer(object):
       self.dataset = dataset.load_tfrecord_dataset(
           tfrecord_path=data_dir,
           lr_size=lr_size,
-          hr_size=hr_size).batch(self.batch_size, drop_remainder=True)
+          hr_size=hr_size).repeat().batch(self.batch_size, drop_remainder=True)
       self.dataset = strategy.experimental_distribute_dataset(self.dataset)
     else:
       if not manual:
@@ -176,6 +176,7 @@ class Trainer(object):
     lambda_ = phase_args["lambda"]
     hr_dimension = self.settings["dataset"]["hr_dimension"]
     eta = phase_args["eta"]
+    total_steps = phase_args["num_steps"]
     tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     optimizer = partial(
         tf.optimizers.Adam,
@@ -228,7 +229,6 @@ class Trainer(object):
         loss_type=phase_args["perceptual_loss_type"])
 
     def _step_fn(image_lr, image_hr):
-      tf.print(image_lr.shape, image_hr.shape)
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         fake = generator.unsigned_call(image_lr)
         percep_loss = perceptual_loss(image_hr, fake)
@@ -270,6 +270,8 @@ class Trainer(object):
       for (image_lr, image_hr) in self.dataset:
         step = tf.summary.experimental.get_step()
         num_step = train_step(image_lr, image_hr)
+        if num_step >= total_steps:
+          break
         if status:
           status.assert_consumed()
           logging.info("consumed checkpoint successfully!")
