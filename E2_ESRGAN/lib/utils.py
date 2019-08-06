@@ -183,11 +183,14 @@ def assign_to_worker(use_tpu):
     return "/job:worker"
   return ""
 
+
 class _DummyStrategy(object):
   def __enter__(self):
     pass
+
   def __exit__(self):
     pass
+
 
 class SingleDeviceStrategy(object):
   """ Dummy Strategy when Outside TPU """
@@ -199,6 +202,8 @@ class SingleDeviceStrategy(object):
     return fn(*args, **kwargs)
 
 # Model Utils
+
+
 class RDB(tf.keras.layers.Layer):
   """ Residual Dense Block Layer """
 

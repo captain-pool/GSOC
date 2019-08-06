@@ -109,7 +109,7 @@ def augment_image(
   return augment_fn
 
 
-def reform_dataset(dataset, types, size):
+def reform_dataset(dataset, types, size, num_elems=None):
   """ Helper function to convert the output_dtype of the dataset
       from (tf.float32, tf.uint8) to desired dtype
       Args:
@@ -119,8 +119,12 @@ def reform_dataset(dataset, types, size):
       Returns:
         tf.data.Dataset with the images of dimension >= Args.size and types = Args.types
   """
+  _carrier={"num_elems": num_elems}
   def generator_fn():
-    for data in dataset:
+    for idx, data in enumerate(dataset, 1):
+      if _carrier["num_elems"]:
+        if not idx % _carrier["num_elems"]:
+          raise StopIteration
       if data[0].shape[0] >= size[0] and data[0].shape[1] >= size[1]:
         yield data[0], data[1]
       else:
@@ -138,7 +142,8 @@ def load_dataset_directory(
         augment=False,
         cache_dir="cache/",
         buffer_size=3 * 32,
-        options=None):
+        options=None,
+        num_elems=65536):
   """ Loads image_label dataset from a local directory:
       Structure of the local directory should be:
 
@@ -176,7 +181,8 @@ def load_dataset_directory(
           download_and_prepare_kwargs={
               "download_config": dl_config}),
       (tf.float32, tf.float32),
-      size=low_res_map_fn.size)
+      size=low_res_map_fn.size,
+      num_elems=num_elems)
   if options:
     dataset.with_options(options)
   dataset = dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
@@ -207,7 +213,8 @@ def load_dataset(
         buffer_size=3 * 32,
         cache_dir="cache/",
         data_dir=None,
-        options=None):
+        options=None,
+        num_elems=65536):
   """ Helper function to load a dataset from tensorflow_datasets
       Args:
           name: Name of the dataset builder from tensorflow_datasets to load the data.
@@ -233,7 +240,8 @@ def load_dataset(
           split=split,
           as_supervised=True),
       (tf.float32, tf.float32),
-      size=low_res_map_fn.size)
+      size=low_res_map_fn.size,
+      num_elems=num_elems)
   if options:
     dataset.with_options(options)
   dataset = dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
@@ -277,4 +285,4 @@ def load_tfrecord_dataset(tfrecord_path, lr_size, hr_size):
     option = tf.data.Options()
     option.auto_shard = False
     ds.with_options(ds)
-  return ds
+  return ds.shuffle(128, reshuffle_each_iteration=True)

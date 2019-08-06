@@ -27,25 +27,25 @@ class Trainer(object):
     self.settings = settings
     self.model_dir = model_dir
     self.summary_writer = summary_writer
-    self.iterations = self.settings["iterations"]
     self.strategy = strategy
     dataset_args = self.settings["dataset"]
     self.batch_size = self.settings["batch_size"]
     hr_size = tf.convert_to_tensor(
         [dataset_args["hr_dimension"],
-        dataset_args["hr_dimension"], 3])
+         dataset_args["hr_dimension"], 3])
 
-    lr_size = tf.cast(hr_size, tf.float32) * tf.convert_to_tensor([1/4, 1/4, 1], tf.float32)
+    lr_size = tf.cast(hr_size, tf.float32) * \
+        tf.convert_to_tensor([1 / 4, 1 / 4, 1], tf.float32)
     lr_size = tf.cast(lr_size, tf.int32)
     if isinstance(strategy, tf.distribute.Strategy):
       self.dataset = dataset.load_tfrecord_dataset(
           tfrecord_path=data_dir,
           lr_size=lr_size,
-          hr_size=hr_size).batch(self.batch_size).prefetch(1024)
-      self.dataset = strategy.experimental_distribute_dataset(self.dataset)
+          hr_size=hr_size).repeat().batch(self.batch_size, drop_remainder=True)
+      self.dataset = iter(strategy.experimental_distribute_dataset(self.dataset))
     else:
       if not manual:
-        self.dataset = dataset.load_dataset(
+        self.dataset = iter(dataset.load_dataset(
             dataset_args["name"],
             dataset.scale_down(
                 method=dataset_args["scale_method"],
@@ -53,9 +53,9 @@ class Trainer(object):
             batch_size=settings["batch_size"],
             data_dir=data_dir,
             augment=True,
-            shuffle=True)
+            shuffle=True))
       else:
-        self.dataset = dataset.load_dataset_directory(
+        self.dataset = iter(dataset.load_dataset_directory(
             dataset_args["name"],
             data_dir,
             dataset.scale_down(
@@ -63,7 +63,7 @@ class Trainer(object):
                 dimension=dataset_args["hr_dimension"]),
             batch_size=settings["batch_size"],
             augment=True,
-            shuffle=True)
+            shuffle=True))
 
   def warmup_generator(self, generator):
     """ Training on L1 Loss to warmup the Generator.
@@ -81,7 +81,7 @@ class Trainer(object):
     decay_params = phase_args["adam"]["decay"]
     decay_step = decay_params["step"]
     decay_factor = decay_params["factor"]
-
+    total_steps = phase_args["num_steps"]
     metric = tf.keras.metrics.Mean()
     psnr_metric = tf.keras.metrics.Mean()
     tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
@@ -116,52 +116,59 @@ class Trainer(object):
       G_optimizer.apply_gradients(
           zip(gradient, gen_vars))
       mean_loss = metric(loss)
+      return tf.cast(G_optimizer.iterations, tf.float32)
 
     @tf.function
     def train_step(image_lr, image_hr):
-      self.strategy.experimental_run_v2(_step_fn, args=[image_lr, image_hr])
+      distributed_metric = self.strategy.experimental_run_v2(
+          _step_fn, args=[image_lr, image_hr])
+      mean_metric = self.strategy.reduce(
+          tf.distribute.ReduceOp.MEAN, distributed_metric, axis=None)
+      return mean_metric
 
-    for epoch in range(1, self.iterations + 1):
-      for image_lr, image_hr in self.dataset:
-        step = tf.summary.experimental.get_step()
-        if warmup_num_iter and step % warmup_num_iter:
-          return
-        train_step(image_lr, image_hr)
-        if status:
-          status.assert_consumed()
-          logging.info(
-              "consumed checkpoint for phase_1 successfully")
-          status = None
+    while True:
+      image_lr, image_hr = next(self.dataset)
+      step = tf.summary.experimental.get_step()
+      if warmup_num_iter and step % warmup_num_iter:
+        return
 
-        if not step % decay_step and step:  # Decay Learning Rate
-          logging.debug(
-              "Learning Rate: %s" %
-              G_optimizer.learning_rate.numpy)
-          G_optimizer.learning_rate.assign(
-              G_optimizer.learning_rate * decay_factor)
-          logging.debug(
-              "Decayed Learning Rate by %f. Current Learning Rate %s" % (
-                  decay_factor, G_optimizer.learning_rate))
-        with self.summary_writer.as_default():
-          tf.summary.scalar(
-              "warmup_loss", metric.result(), step=step)
-          tf.summary.scalar("mean_psnr", psnr_metric.result(), step=step)
-          step.assign_add(1)
+      num_steps = train_step(image_lr, image_hr)
 
-        if not step % self.settings["print_step"]:
-          logging.info(
-              "[WARMUP] Epoch: {}\tBatch: {}\tGenerator Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
-                  epoch,
-                  step //
-                  epoch,
-                  metric,
-                  psnr_metric,
-                  time.time() -
-                  start_time))
-          if metric.result() < previous_loss:
-            utils.save_checkpoint(checkpoint, "phase_1", self.model_dir)
-          previous_loss = metric.result()
-          start_time = time.time()
+      if num_steps >= total_steps:
+        return
+      if status:
+        status.assert_consumed()
+        logging.info(
+            "consumed checkpoint for phase_1 successfully")
+        status = None
+
+      if not num_steps % decay_step:  # Decay Learning Rate
+        logging.debug(
+            "Learning Rate: %s" %
+            G_optimizer.learning_rate.numpy)
+        G_optimizer.learning_rate.assign(
+            G_optimizer.learning_rate * decay_factor)
+        logging.debug(
+            "Decayed Learning Rate by %f. Current Learning Rate %s" % (
+                decay_factor, G_optimizer.learning_rate))
+      with self.summary_writer.as_default():
+        tf.summary.scalar(
+            "warmup_loss", metric.result(), step=step)
+        tf.summary.scalar("mean_psnr", psnr_metric.result(), step=step)
+        step.assign_add(1)
+
+      if not num_steps % self.settings["print_step"]:
+        logging.info(
+            "[WARMUP] Step: {}\tGenerator Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
+                num_steps,
+                metric,
+                psnr_metric,
+                time.time() -
+                start_time))
+        if metric.result() < previous_loss:
+          utils.save_checkpoint(checkpoint, "phase_1", self.model_dir)
+        previous_loss = metric.result()
+        start_time = time.time()
 
   def train_gan(self, generator, discriminator):
     """ Implements Training routine for ESRGAN
@@ -176,6 +183,7 @@ class Trainer(object):
     lambda_ = phase_args["lambda"]
     hr_dimension = self.settings["dataset"]["hr_dimension"]
     eta = phase_args["eta"]
+    total_steps = phase_args["num_steps"]
     tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     optimizer = partial(
         tf.optimizers.Adam,
@@ -203,9 +211,8 @@ class Trainer(object):
     if not tf.io.gfile.exists(
         os.path.join(
             self.model_dir,
-            os.path.join(
             self.settings["checkpoint_path"]["phase_2"],
-            "checkpoint"))):
+            "checkpoint")):
       hot_start = tf.train.Checkpoint(
           G=generator,
           G_optimizer=G_optimizer,
@@ -240,67 +247,86 @@ class Trainer(object):
         disc_loss = disc_loss * (1.0 / self.batch_size)
         disc_metric(disc_loss)
         gen_metric(gen_loss)
-      psnr = psnr_metric(
-          tf.reduce_mean(
-              tf.image.psnr(
-                  fake,
-                  image_hr,
-                  max_val=256.0)))
+        psnr_metric(
+            tf.reduce_mean(
+                tf.image.psnr(
+                    fake,
+                    image_hr,
+                    max_val=256.0)))
       gen_vars = list(set(generator.trainable_variables))
       disc_vars = list(set(discriminator.trainable_variables))
+      # Debug-Aug6-3-08-PM
+      tf.print(len(gen_vars), len(disc_vars),
+               tf.print(gen_loss), tf.print(disc_loss))
       disc_grad = disc_tape.gradient(
           disc_loss, disc_vars)
       gen_grad = gen_tape.gradient(
           gen_loss, gen_vars)
       G_optimizer.apply_gradients(
-          zip(gen_grad, gen_vars))     
+          zip(gen_grad, gen_vars))
       D_optimizer.apply_gradients(
           zip(disc_grad, disc_vars))
-
-
+      return tf.cast(G_optimizer.iterations, tf.float32)
     @tf.function
     def train_step(image_lr, image_hr):
+      distributed_iterations = self.strategy.experimental_run_v2(
+          _step_fn,
+          args=(image_lr, image_hr))
+      num_steps = self.strategy.reduce(
+          tf.distribute.ReduceOp.MEAN,
+          distributed_iterations,
+          axis=None)
+      return num_steps
+    start = time.time()
+    while True:
+      image_lr, image_hr = next(self.dataset)
+      step = tf.summary.experimental.get_step()
+      num_step = train_step(image_lr, image_hr)
+      if num_step >= total_steps:
+        return
+      if status:
+        status.assert_consumed()
+        logging.info("consumed checkpoint successfully!")
+        status = None
+      # Decaying Learning Rate
+      for _step in decay_steps.copy():
+        if (num_step - 1) >= _step:
+          decay_steps.pop()
+          g_current_lr = self.strategy.reduce(
+              tf.distribute.ReduceOp.MEAN,
+              G_optimizer.learning_rate, axis=None)
 
-      self.strategy.experimental_run_v2(_step_fn, args=(image_lr, image_hr))
+          d_current_lr = self.strategy.reduce(
+              tf.distribute.ReduceOp.MEAN,
+              D_optimizer.learning_rate, axis=None)
 
-    for epoch in range(1, self.iterations + 1):
-      # Resetting Metrics
-      start = time.time()
-      for (image_lr, image_hr) in self.dataset:
-        step = tf.summary.experimental.get_step()
-        train_step(image_lr, image_hr)
-        if status:
-          status.assert_consumed()
-          logging.info("consumed checkpoint successfully!")
-          status = None
+          logging.debug(
+              "Current LR: G = %s, D = %s" %
+              (g_current_lr, d_current_lr))
+          logging.debug(
+              "[Phase 2] Decayed Learing Rate by %f." % decay_factor)
+          G_optimizer.learning_rate.assign(
+              G_optimizer.learning_rate * decay_factor)
+          D_optimizer.learning_rate.assign(
+              D_optimizer.learning_rate * decay_factor)
 
-        # Decaying Learning Rate
-        for _step in decay_steps.copy():
-          if (step - 1) >= _step:
-            decay_steps.pop()
-            logging.debug(
-                "[Phase 2] Decayed Learing Rate by %f." % decay_factor)
-            G_optimizer.learning_rate.assign(
-                G_optimizer.learning_rate * decay_factor)
-            D_optimizer.learning_rate.assign(
-                D_optimizer.learning_rate * decay_factor)
+      # Writing Summary
+      with self.summary_writer.as_default():
+        tf.summary.scalar(
+            "gen_loss", gen_metric.result(), step=step)
+        tf.summary.scalar(
+            "disc_loss", disc_metric.result(), step=step)
+        tf.summary.scalar("mean_psnr", psnr_metric.result(), step=step)
+        step.assign_add(1)
 
-        # Writing Summary
-        with self.summary_writer.as_default():
-          tf.summary.scalar(
-              "gen_loss", gen_metric.result(), step=step)
-          tf.summary.scalar(
-              "disc_loss", disc_metric.result(), step=step)
-          tf.summary.scalar("mean_psnr", psnr_metric.result(), step=step)
-          step.assign_add(1)
-
-        # Logging and Checkpointing
-        if not step % self.settings["print_step"]:
-          logging.info(
-              "Epoch: {}\tBatch: {}\tGen Loss: {}\tDisc Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
-                  (epoch + 1), step // (epoch + 1),
-                  gen_metric.result(),
-                  disc_metric.result(), psnr_metric,
-                  time.time() - start))
-          utils.save_checkpoint(checkpoint, "phase_2", self.model_dir)
-          start = time.time()
+      # Logging and Checkpointing
+      if not step % self.settings["print_step"]:
+        logging.info(
+            "Step: {}\tGen Loss: {}\tDisc Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
+                (num_step,
+                gen_metric.result(),
+                disc_metric.result(),
+                psnr_metric.result(),
+                time.time() - start)))
+        utils.save_checkpoint(checkpoint, "phase_2", self.model_dir)
+        start = time.time()

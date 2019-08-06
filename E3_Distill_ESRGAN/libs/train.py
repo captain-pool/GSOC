@@ -18,14 +18,14 @@ class Trainer(object):
   """Trainer Class for Knowledge Distillation of ESRGAN"""
 
   def __init__(
-        self,
-        teacher,
-        discriminator,
-        summary_writer,
-        summary_writer_2=None,
-        model_dir="",
-        data_dir="",
-        strategy=None):
+          self,
+          teacher,
+          discriminator,
+          summary_writer,
+          summary_writer_2=None,
+          model_dir="",
+          data_dir="",
+          strategy=None):
     """
       Args:
         teacher: Keras Model of pre-trained teacher generator.
@@ -55,7 +55,8 @@ class Trainer(object):
         lr_size=[64, 64, 3],
         hr_size=[256, 256, 3])
     self.dataset = (
-        self.dataset.batch(self.batch_size, drop_remainder=True)
+        self.dataset.repeat()
+        .batch(self.batch_size, drop_remainder=True)
         .prefetch(1024))
     self.dataset = self.strategy.experimental_distribute_dataset(
         self.dataset)
@@ -82,6 +83,7 @@ class Trainer(object):
       Args:
         student: Keras model of the student.
     """
+    total_steps = self.train_args["num_steps"]
     if not tf.summary.experimental.get_step():
       tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     optimizer = tf.optimizers.Adam()
@@ -120,6 +122,9 @@ class Trainer(object):
       gradient = tape.gradient(loss, student_vars)
       train_op = optimizer.apply_gradients(
           zip(gradient, student_vars))
+      with tf.control_dependencies([train_op]):
+        return optimizer.iterations
+
     @tf.function
     def train_step(image_lr, image_hr):
       """
@@ -129,15 +134,21 @@ class Trainer(object):
           image_lr: Distributed batch of Low Resolution Images
           image_hr: Distributed batch of High Resolution Images
       """
-      self.strategy.experimental_run_v2(
+      distribute_metric = self.strategy.experimental_run_v2(
           step_fn, args=(image_lr, image_hr))
+      mean_metric = self.strategy.reduce(
+          tf.distribute.ReduceOp.MEAN, distributed_metric)
+      return mean_metric
+
     logging.info("Starting comparative loss training")
 
     for epoch in range(1, self.train_args["iterations"] + 1):
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
-        x = train_step(image_lr, image_hr)
+        num_steps = train_step(image_lr, image_hr)
         self.__checkstat.assert_consumed()
+        if num_steps >= total_steps:
+          return
         if status:
           status.assert_consumed()
           logging.info("Checkpoint loaded successfully")
@@ -152,7 +163,7 @@ class Trainer(object):
 
         if not step % self.train_args["print_step"]:
           logging.info("[COMPARATIVE LOSS] Epoch: %d\tBatch: %d\tLoss: %f" %
-                       (epoch, step // epoch, metric_fn.result()))
+                       (epoch, num_steps // epoch, metric_fn.result()))
         # Saving Checkpoint
         if not step % self.train_args["checkpoint_step"]:
           utils.save_checkpoint(
@@ -169,6 +180,7 @@ class Trainer(object):
       Args:
         student: Keras model of the student to train.
     """
+    total_steps = self.train_args["num_steps"]
     if not tf.summary.experimental.get_step():
       tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     ra_generator = utils.RelativisticAverageLoss(
@@ -229,6 +241,7 @@ class Trainer(object):
           zip(discriminator_gradient, teacher_vars))
       generator_metric(generator_loss)
       discriminator_metric(discriminator_loss)
+      return generator_optimizer.iterations
 
     @tf.function
     def train_step(image_lr, image_hr):
@@ -239,17 +252,22 @@ class Trainer(object):
           image_lr: Distributed batch of Low Resolution Images
           image_hr: Distributed batch of High Resolution Images
       """
-      self.strategy.experimental_run_v2(
+      distributed_metric = self.strategy.experimental_run_v2(
           step_fn,
           args=(image_lr, image_hr))
+      mean_metric = self.strategy.reduce(tf.distribute.ReduceOp.MEAN,
+                                         distributed_metric)
+      return mean_metric
 
     logging.info("Starting Adversarial Training")
 
     for epoch in range(1, self.train_args["iterations"] + 1):
       for image_lr, image_hr in self.dataset:
         step = tf.summary.experimental.get_step()
-        train_step(image_lr, image_hr)
+        num_steps = train_step(image_lr, image_hr)
         self.__checkstat.assert_consumed()
+        if num_steps >= total_steps:
+          return
         if status:
           status.assert_consumed()
           status = None

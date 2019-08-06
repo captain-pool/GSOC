@@ -27,7 +27,11 @@ class Settings(object):
 
   def get(self, index, default=None):
     with open(self.__path, "r") as file_:
-      return yaml.load(file_.read(), Loader=yaml.FullLoader).get(index, default)
+      return yaml.load(
+          file_.read(),
+          Loader=yaml.FullLoader).get(
+          index,
+          default)
 
 
 class Stats(object):
