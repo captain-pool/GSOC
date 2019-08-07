@@ -23,7 +23,7 @@ train_psnr:
     initial_lr: 0.002 # Theory 0.0002
     decay:
       factor: 0.5
-      step: 4000 # Theory: 2 x 10^5 Steps
+      step: 2000 # Theory: 2 x 10^5 Steps
     beta_1: 0.9
     beta_2: 0.999
 train_combined:

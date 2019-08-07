@@ -21,16 +21,14 @@ def generate_tf_record(
         data_dir,
         dataset.scale_down(
             method=dataset_args["scale_method"],
-            size=student_sett["hr_size"]),
-        num_elems=65536)
+            size=student_sett["hr_size"]))
   else:
     ds = dataset.load_dataset(
         dataset_args["name"],
         dataset.scale_down(
             method=dataset_args["scale_method"],
             size=student_sett["hr_size"]),
-        data_dir=data_dir,
-        num_elems=65536)
+        data_dir=data_dir)
   to_tfrecord(ds, tfrecord_path, num_shards)
 
 
@@ -58,6 +56,7 @@ def load_dataset(tfrecord_path, lr_size, hr_size):
     option = tf.data.Options()
     option.auto_shard = False
     ds.with_options(ds)
+  ds = ds.shuffle(128)
   return ds
 
 

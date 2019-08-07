@@ -220,7 +220,7 @@ class Trainer(object):
       status = utils.load_checkpoint(hot_start, "phase_1", self.model_dir)
       # consuming variable from checkpoint
       tf.summary.experimental.get_step()
-
+      G_optimizer.learning_rate.assign(phase_args["adam"]["initial_lr"])
       tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     else:
       status = utils.load_checkpoint(checkpoint, "phase_2", self.model_dir)
@@ -241,8 +241,11 @@ class Trainer(object):
         percep_loss = perceptual_loss(image_hr, fake)
         l1_loss = utils.pixel_loss(image_hr, fake)
         loss_RaG = ra_gen(image_hr, fake)
+        logging.debug("RA Generator")
         disc_loss = ra_disc(image_hr, fake)
+        logging.debug("RA Discriminator")
         gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
+        logging.debug("Generator Loss")
         gen_loss = gen_loss * (1.0 / self.batch_size)
         disc_loss = disc_loss * (1.0 / self.batch_size)
         disc_metric(disc_loss)
@@ -253,20 +256,25 @@ class Trainer(object):
                     fake,
                     image_hr,
                     max_val=256.0)))
-      gen_vars = list(set(generator.trainable_variables))
-      disc_vars = list(set(discriminator.trainable_variables))
+      # gen_vars = list(set(generator.trainable_variables))
+      # disc_vars = list(set(discriminator.trainable_variables))
       # Debug-Aug6-3-08-PM
-      tf.print(len(gen_vars), len(disc_vars),
-               tf.print(gen_loss), tf.print(disc_loss))
+      # tf.print(len(gen_vars), len(disc_vars),
+      #         tf.print(gen_loss), tf.print(disc_loss))
       disc_grad = disc_tape.gradient(
-          disc_loss, disc_vars)
+          disc_loss, discriminator.trainable_variables)
+      logging.debug("Discriminator Gradient")
       gen_grad = gen_tape.gradient(
-          gen_loss, gen_vars)
+          gen_loss, generator.trainable_variables)
+      logging.debug("Generator Gradient")
       G_optimizer.apply_gradients(
-          zip(gen_grad, gen_vars))
+          zip(gen_grad, generator.trainable_variables))
+      logging.debug("Generator Apply")
       D_optimizer.apply_gradients(
-          zip(disc_grad, disc_vars))
-      return tf.cast(G_optimizer.iterations, tf.float32)
+          zip(disc_grad, discriminator.trainable_variables))
+      logging.debug("Discriminator Apply")
+
+      return tf.cast(D_optimizer.iterations, tf.float32)
     @tf.function
     def train_step(image_lr, image_hr):
       distributed_iterations = self.strategy.experimental_run_v2(
@@ -290,8 +298,8 @@ class Trainer(object):
         status = None
       # Decaying Learning Rate
       for _step in decay_steps.copy():
-        if (num_step - 1) >= _step:
-          decay_steps.pop()
+        if num_step >= _step:
+          decay_steps.pop(0)
           g_current_lr = self.strategy.reduce(
               tf.distribute.ReduceOp.MEAN,
               G_optimizer.learning_rate, axis=None)
@@ -323,10 +331,10 @@ class Trainer(object):
       if not step % self.settings["print_step"]:
         logging.info(
             "Step: {}\tGen Loss: {}\tDisc Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
-                (num_step,
+                num_step,
                 gen_metric.result(),
                 disc_metric.result(),
                 psnr_metric.result(),
-                time.time() - start)))
+                time.time() - start))
         utils.save_checkpoint(checkpoint, "phase_2", self.model_dir)
         start = time.time()

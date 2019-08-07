@@ -58,8 +58,8 @@ class Trainer(object):
         self.dataset.repeat()
         .batch(self.batch_size, drop_remainder=True)
         .prefetch(1024))
-    self.dataset = self.strategy.experimental_distribute_dataset(
-        self.dataset)
+    self.dataset = iter(self.strategy.experimental_distribute_dataset(
+        self.dataset))
     # Reloading Checkpoint from Phase 2 Training of ESRGAN
     if not utils.checkpoint_exists(
             names=[
@@ -123,7 +123,7 @@ class Trainer(object):
       train_op = optimizer.apply_gradients(
           zip(gradient, student_vars))
       with tf.control_dependencies([train_op]):
-        return optimizer.iterations
+        return tf.cast(optimizer.iterations, tf.float32)
 
     @tf.function
     def train_step(image_lr, image_hr):
@@ -139,39 +139,37 @@ class Trainer(object):
       mean_metric = self.strategy.reduce(
           tf.distribute.ReduceOp.MEAN, distributed_metric)
       return mean_metric
-
     logging.info("Starting comparative loss training")
+    while True:
+      image_lr, image_hr = next(self.dataset)
+      step = tf.summary.experimental.get_step()
+      num_steps = train_step(image_lr, image_hr)
+      self.__checkstat.assert_consumed()
+      if num_steps >= total_steps:
+        return
+      if status:
+        status.assert_consumed()
+        logging.info("Checkpoint loaded successfully")
+        status = None
+      # Writing Summary
+      with self.summary_writer.as_default():
+        tf.summary.scalar("loss", metric_fn.result(), step=step)
+        tf.summary.scalar("psnr", student_psnr.result(), step=step)
+      if self.summary_writer_2:
+        with self.summary_writer_2.as_default():
+          tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
 
-    for epoch in range(1, self.train_args["iterations"] + 1):
-      for image_lr, image_hr in self.dataset:
-        step = tf.summary.experimental.get_step()
-        num_steps = train_step(image_lr, image_hr)
-        self.__checkstat.assert_consumed()
-        if num_steps >= total_steps:
-          return
-        if status:
-          status.assert_consumed()
-          logging.info("Checkpoint loaded successfully")
-          status = None
-        # Writing Summary
-        with self.summary_writer.as_default():
-          tf.summary.scalar("loss", metric_fn.result(), step=step)
-          tf.summary.scalar("psnr", student_psnr.result(), step=step)
-        if self.summary_writer_2:
-          with self.summary_writer_2.as_default():
-            tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
-
-        if not step % self.train_args["print_step"]:
-          logging.info("[COMPARATIVE LOSS] Epoch: %d\tBatch: %d\tLoss: %f" %
-                       (epoch, num_steps // epoch, metric_fn.result()))
-        # Saving Checkpoint
-        if not step % self.train_args["checkpoint_step"]:
-          utils.save_checkpoint(
-              checkpoint,
-              "comparative_checkpoint",
-              basepath=self.model_dir,
-              use_student_settings=True)
-        step.assign_add(1)
+      if not step % self.train_args["print_step"]:
+        logging.info("[COMPARATIVE LOSS] Step: %s\tLoss: %s" %
+                     (num_steps, metric_fn.result()))
+      # Saving Checkpoint
+      if not step % self.train_args["checkpoint_step"]:
+        utils.save_checkpoint(
+            checkpoint,
+            "comparative_checkpoint",
+            basepath=self.model_dir,
+            use_student_settings=True)
+      step.assign_add(1)
 
   def train_adversarial(self, student):
     """
@@ -241,7 +239,7 @@ class Trainer(object):
           zip(discriminator_gradient, teacher_vars))
       generator_metric(generator_loss)
       discriminator_metric(discriminator_loss)
-      return generator_optimizer.iterations
+      return tf.cast(discriminator_optimizer.iterations, tf.float32)
 
     @tf.function
     def train_step(image_lr, image_hr):
@@ -261,39 +259,41 @@ class Trainer(object):
 
     logging.info("Starting Adversarial Training")
 
-    for epoch in range(1, self.train_args["iterations"] + 1):
-      for image_lr, image_hr in self.dataset:
-        step = tf.summary.experimental.get_step()
-        num_steps = train_step(image_lr, image_hr)
-        self.__checkstat.assert_consumed()
-        if num_steps >= total_steps:
-          return
-        if status:
-          status.assert_consumed()
-          status = None
-        # Setting Up Logging
-        with self.summary_writer.as_default():
-          tf.summary.scalar(
-              "student_loss",
-              generator_metric.result(),
-              step=step)
-          tf.summary.scalar(
-              "teacher_discriminator_loss",
-              discriminator_metric.result(),
-              step=step)
-          tf.summary.scalar("psnr", student_psnr.result(), step=step)
-        if self.summary_writer_2:
-          with self.summary_writer_2.as_default():
-            tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
-        if not step % self.train_args["print_step"]:
-          logging.info(
-              "[ADVERSARIAL] Epoch: %d\tBatch: %d\tStudent Loss: %f" %
-              (epoch, step // epoch, generator_metric.result()))
-        step.assign_add(1)
-        # Setting Up Checkpoint
-        if not step % self.train_args["checkpoint_step"]:
-          utils.save_checkpoint(
-              checkpoint,
-              "adversarial_checkpoint",
-              basepath=self.model_dir,
-              use_student_settings=True)
+    while True:
+      image_lr, image_hr = next(self.dataset)
+      step = tf.summary.experimental.get_step()
+      num_steps = train_step(image_lr, image_hr)
+      self.__checkstat.assert_consumed()
+      if num_steps >= total_steps:
+        return
+      if status:
+        status.assert_consumed()
+        status = None
+      # Setting Up Logging
+      with self.summary_writer.as_default():
+        tf.summary.scalar(
+            "student_loss",
+            generator_metric.result(),
+            step=step)
+        tf.summary.scalar(
+            "teacher_discriminator_loss",
+            discriminator_metric.result(),
+            step=step)
+        tf.summary.scalar("psnr", student_psnr.result(), step=step)
+      if self.summary_writer_2:
+        with self.summary_writer_2.as_default():
+          tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
+      if not step % self.train_args["print_step"]:
+        logging.info(
+            "[ADVERSARIAL] Step: %s\tStudent Loss: %s\t"
+            "Discriminator Loss: %s" %
+            (step, generator_metric.result(),
+            discriminator_metric.result()))
+      step.assign_add(1)
+      # Setting Up Checkpoint
+      if not step % self.train_args["checkpoint_step"]:
+        utils.save_checkpoint(
+            checkpoint,
+            "adversarial_checkpoint",
+            basepath=self.model_dir,
+            use_student_settings=True)

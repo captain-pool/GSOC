@@ -100,6 +100,7 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
   """
   vgg_model = tf.keras.applications.VGG19(
       input_shape=input_shape, weights=weights, include_top=False)
+  logging.debug("Perceptual Loss Weight: ", weights)
   for layer in vgg_model.layers:
     layer.trainable = False
   phi = tf.keras.Model(
@@ -111,7 +112,7 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
     y_true = tf.cast(y_true, tf.float32)
     y_pred = tf.cast(y_pred, tf.float32)
     if loss_type.lower() == "l1":
-      return tf.reduce_mean(tf.abs(phi(y_true) - phi(y_pred)))
+      return tf.reduce_mean(tf.reduce_mean(tf.abs(phi(y_true) - phi(y_pred)), axis=0))
     if loss_type.lower() == "l2":
       return tf.keras.losses.MSE(phi(y_true), phi(y_pred))
     raise ValueError(
@@ -123,7 +124,7 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
 def pixel_loss(y_true, y_pred):
   y_true = tf.cast(y_true, tf.float32)
   y_pred = tf.cast(y_pred, tf.float32)
-  return tf.reduce_mean(tf.abs(y_true - y_pred))
+  return tf.reduce_mean(tf.reduce_mean(tf.abs(y_true - y_pred), axis=0))
 
 
 def RelativisticAverageLoss(non_transformed_disc, type_="G"):
