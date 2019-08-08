@@ -57,20 +57,14 @@ class Trainer(object):
     self.dataset = iter(self.strategy.experimental_distribute_dataset(
         self.dataset))
     # Reloading Checkpoint from Phase 2 Training of ESRGAN
-    if not utils.checkpoint_exists(
-            names=[
-                "comparative_checkpoint",
-                "adversarial_checkpoint"],
-            basepath=self.model_dir,
-            use_student_settings=True):
-      checkpoint = tf.train.Checkpoint(
-          G=self.teacher_generator,
-          D=self.teacher_discriminator)
-      utils.load_checkpoint(
-          checkpoint,
-          "phase_2",
-          basepath=model_dir,
-          use_student_settings=False)
+    checkpoint = tf.train.Checkpoint(
+      G=self.teacher_generator,
+      D=self.teacher_discriminator)
+    utils.load_checkpoint(
+        checkpoint,
+        "phase_2",
+        basepath=model_dir,
+        use_student_settings=False)
 
   def train_comparative(self, student, export_only=False):
     """
@@ -178,18 +172,21 @@ class Trainer(object):
         student: Keras model of the student to train.
     """
     total_steps = self.train_args["num_steps"]
+    decay_steps = self.train_args["decay_steps"]
+    decay_rate = self.train_args["decay_rate"]
     if not tf.summary.experimental.get_step():
       tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     ra_generator = utils.RelativisticAverageLoss(
         self.teacher_discriminator, type_="G")
     ra_discriminator = utils.RelativisticAverageLoss(
         self.teacher_discriminator, type_="D")
+    loss_fn = tf.keras.losses.MeanSquaredError(reduction="none")
     alpha = self.train_args["balance_factor"]
     generator_metric = tf.keras.metrics.Mean()
     discriminator_metric = tf.keras.metrics.Mean()
-    generator_optimizer = tf.optimizers.Adam()
+    generator_optimizer = tf.optimizers.Adam(learning_rate=1e-4)
     dummy_optimizer = tf.optimizers.Adam()
-    discriminator_optimizer = tf.optimizers.Adam()
+    discriminator_optimizer = tf.optimizers.Adam(learning_rate=1e-4)
     status = None
     if not utils.checkpoint_exists(
             names="adversarial_checkpoint",
@@ -197,21 +194,21 @@ class Trainer(object):
             use_student_settings=True):
       if export_only:
         raise ValueError("Checkpoint for this phase not found")
-      if utils.checkpoint_exists(
-              names="comparative_checkpoint",
-              basepath=self.model_dir,
-              use_student_settings=True):
-        hot_start = tf.train.Checkpoint(
-            student_generator=student,
-            student_optimizer=dummy_optimizer,
-            summary_step=tf.summary.experimental.get_step())
-        status = utils.load_checkpoint(
-            hot_start,
-            "comparative_checkpoint",
-            basepath=self.model_dir,
-            use_student_settings=True)
-        # resetting summary step
-        tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
+#      if utils.checkpoint_exists(
+#              names="comparative_checkpoint",
+#              basepath=self.model_dir,
+#              use_student_settings=True):
+#        hot_start = tf.train.Checkpoint(
+#            student_generator=student,
+#            student_optimizer=dummy_optimizer,
+#            summary_step=tf.summary.experimental.get_step())
+#        utils.load_checkpoint(
+#            hot_start,
+#            "comparative_checkpoint",
+#            basepath=self.model_dir,
+#            use_student_settings=True)
+#        # resetting summary step
+#        tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     checkpoint = tf.train.Checkpoint(
         student_generator=student,
         student_optimizer=generator_optimizer,
@@ -219,14 +216,13 @@ class Trainer(object):
         teacher_generator=self.teacher_generator,
         teacher_discriminator=self.teacher_discriminator,
         summary_step=tf.summary.experimental.get_step())
-    if not status:
-      status = utils.load_checkpoint(
-          checkpoint,
-          "adversarial_checkpoint",
-          basepath=self.model_dir,
-          use_student_settings=True)
-      if export_only:
-        return
+    status = utils.load_checkpoint(
+        checkpoint,
+        "adversarial_checkpoint",
+        basepath=self.model_dir,
+        use_student_settings=True)
+    if export_only and status:
+      return
 
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
@@ -239,32 +235,39 @@ class Trainer(object):
           image_hr: Distributed Batch of High Resolution Images
       """
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-        student_fake = student.unsigned_call(image_lr)
-        student_fake = tf.clip_by_value(student_fake, 0, 255)
-        psnr = tf.image.psnr(image_hr, student_fake, max_val=255)
-        student_psnr(psnr)
         teacher_fake = self.teacher_generator.unsigned_call(image_lr)
+        logging.debug("Fetching Fake: Teacher")
         teacher_fake = tf.clip_by_value(teacher_fake, 0, 255)
-        psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255)
-        teacher_psnr(psnr)
+        student_fake = student.unsigned_call(image_lr)
+        logging.debug("Fetching Fake: Student")
+        student_fake = tf.clip_by_value(student_fake, 0, 255)
+        psnr = tf.image.psnr(student_fake, image_hr, max_val=255.0)
+        student_psnr(tf.reduce_mean(psnr))
+        psnr = tf.image.psnr(teacher_fake, image_hr, max_val=255.0)
+        teacher_psnr(tf.reduce_mean(psnr))
         student_ra_loss = ra_generator(image_hr, student_fake)
+        logging.debug("Relativistic Average Loss: Student")
         discriminator_loss = ra_discriminator(image_hr, student_fake)
         discriminator_loss = tf.reduce_mean(
             discriminator_loss) * (1.0 / self.batch_size)
+        logging.debug("Relativistic Average Loss: Teacher")
         mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
         generator_loss = alpha * student_ra_loss + (1 - alpha) * mse_loss
+        logging.debug("Calculating Joint Loss for Generator")
         generator_loss = tf.reduce_mean(
             generator_loss) * (1.0 / self.batch_size)
-      student_vars = list(set(student.trainable_variables))
       generator_gradient = gen_tape.gradient(
-          generator_loss, student_vars)
-      teacher_vars = list(set(self.teacher_discriminator.trainable_variables))
+          generator_loss, student.trainable_variables)
+      logging.debug("calculating gradient: generator")
       discriminator_gradient = disc_tape.gradient(
-          discriminator_loss, teacher_vars)
+          discriminator_loss, self.teacher_discriminator.trainable_variables)
+      logging.debug("calculating gradient: discriminator")
       generator_op = generator_optimizer.apply_gradients(
-          zip(generator_gradient, student_vars))
+          zip(generator_gradient, student.trainable_variables))
+      logging.debug("applying generator gradients")
       discriminator_op = discriminator_optimizer.apply_gradients(
-          zip(discriminator_gradient, teacher_vars))
+          zip(discriminator_gradient, self.teacher_discriminator.trainable_variables))
+      logging.debug("applying discriminator gradients")
       generator_metric(generator_loss)
       discriminator_metric(discriminator_loss)
       with tf.control_dependencies(
@@ -294,11 +297,17 @@ class Trainer(object):
       image_lr, image_hr = next(self.dataset)
       step = tf.summary.experimental.get_step()
       num_steps = train_step(image_lr, image_hr)
-      if num_steps >= total_steps:
-        return
       if status:
         status.assert_consumed()
         status = None
+      for decay_step in decay_steps.copy():
+        if decay_step <= num_steps:
+          decay_steps.pop(0)
+          logging.debug("Decaying Learning Rate by: %s" % decay_rate)
+          generator_optimizer.learning_rate.assign(
+              generator_optimizer.learning_rate * decay_rate)
+          discriminator_optimizer.learning_rate.assign(
+              discriminator_optimizer.learning_rate * decay_rate)
       # Setting Up Logging
       with self.summary_writer.as_default():
         tf.summary.scalar(
@@ -327,3 +336,5 @@ class Trainer(object):
             "adversarial_checkpoint",
             basepath=self.model_dir,
             use_student_settings=True)
+      if num_steps >= total_steps:
+        return

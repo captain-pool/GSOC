@@ -10,7 +10,12 @@ train:
   iterations: 1
   print_step: 100
   num_steps: 10000
-  checkpoint_step: 1000
+  checkpoint_step: 100
+  decay_rate: 0.5
+  decay_steps:
+    - 6100
+    - 9000
+    - 13500
   balance_factor: 0.2 # alpha of Adversarial Training
 
 scale_factor: 2

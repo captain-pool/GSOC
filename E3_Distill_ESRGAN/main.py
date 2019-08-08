@@ -92,13 +92,13 @@ def train_and_export(**kwargs):
     if kwargs["type"].lower().startswith("comparative"):
       trainer.train_comparative(
           student_generator,
-          export_only=stats["comparative"] or kwargs["export_only"])
+          export_only=stats.get("comparative") or kwargs["export_only"])
       if not kwargs["export_only"]:
         stats["comparative"] = True
     elif kwargs["type"].lower().startswith("adversarial"):
       trainer.train_adversarial(
           student_generator,
-          export_only=stats["adversarial"] or kwargs["export_only"])
+          export_only=stats.get("adversarial") or kwargs["export_only"])
       if not kwargs["export_only"]:
         stats["adversarial"] = True
   # Tracing Graph to put input signature

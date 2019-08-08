@@ -212,7 +212,7 @@ class SingleDeviceStrategy(object):
   def __exit__(self, *args, **kwargs):
     pass
 
-  def experimental_distribute_dataset(dataset, *args, **kwargs):
+  def experimental_distribute_dataset(self, dataset, *args, **kwargs):
     return dataset
 
   def experimental_run_v2(self, fn, args, kwargs):
