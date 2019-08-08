@@ -41,14 +41,14 @@ def load_dataset(tfrecord_path, lr_size, hr_size):
     lr_image = tf.io.parse_tensor(
         example["low_res_image"],
         out_type=tf.float32)
-    lr_image = tf.reshape(lr_image, lr_size) 
+    lr_image = tf.reshape(lr_image, lr_size)
     hr_image = tf.io.parse_tensor(
         example["high_res_image"],
         out_type=tf.float32)
     hr_image = tf.reshape(hr_image, hr_size)
     return lr_image, hr_image
   files = tf.io.gfile.glob(
-          os.path.join(tfrecord_path, "*.tfrecord"))
+      os.path.join(tfrecord_path, "*.tfrecord"))
   if len(files) == 0:
     raise ValueError("Path Doesn't contain any file")
   ds = tf.data.TFRecordDataset(files).map(_parse_tf_record)
@@ -76,8 +76,8 @@ def to_tfrecord(ds, tfrecord_path, NUM_SHARDS=8):
 
   def write_to_tfrecord(shard_id, ds):
     filename = tf.strings.join(
-            [tfrecord_path, "/dataset.", tf.strings.as_string(shard_id),
-                ".tfrecord"])
+        [tfrecord_path, "/dataset.", tf.strings.as_string(shard_id),
+         ".tfrecord"])
     writer = tf.data.experimental.TFRecordWriter(filename)
     writer.write(ds.map(lambda _, x: x))
     return tf.data.Dataset.from_tensors(filename)

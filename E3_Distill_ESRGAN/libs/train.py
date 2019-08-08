@@ -76,7 +76,7 @@ class Trainer(object):
           basepath=model_dir,
           use_student_settings=False)
 
-  def train_comparative(self, student):
+  def train_comparative(self, student, export_only=False):
     """
       Trains the student using a comparative loss function (Mean Squared Error)
       based on the output of Teacher.
@@ -96,6 +96,8 @@ class Trainer(object):
         "comparative_checkpoint",
         basepath=self.model_dir,
         use_student_settings=True)
+    if export_only:
+      return
     loss_fn = tf.keras.losses.MeanSquaredError(reduction="none")
     metric_fn = tf.keras.metrics.Mean()
     student_psnr = tf.keras.metrics.Mean()
@@ -172,7 +174,7 @@ class Trainer(object):
             use_student_settings=True)
       step.assign_add(1)
 
-  def train_adversarial(self, student):
+  def train_adversarial(self, student, export_only=False):
     """
       Train the student adversarially using a joint loss between teacher discriminator
       and mean squared error between the output of the student-teacher generator pair.
@@ -203,6 +205,8 @@ class Trainer(object):
         "adversarial_checkpoint",
         basepath=self.model_dir,
         use_student_settings=True)
+    if export_only:
+      return
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
 
@@ -290,7 +294,7 @@ class Trainer(object):
             "[ADVERSARIAL] Step: %s\tStudent Loss: %s\t"
             "Discriminator Loss: %s" %
             (num_steps, generator_metric.result(),
-            discriminator_metric.result()))
+             discriminator_metric.result()))
       step.assign_add(1)
       # Setting Up Checkpoint
       if not step % self.train_args["checkpoint_step"]:

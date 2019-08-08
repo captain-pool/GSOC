@@ -83,16 +83,22 @@ def train_and_export(**kwargs):
         model_dir=kwargs["modeldir"],
         data_dir=kwargs["datadir"],
         strategy=strategy)
-
+    phase_name = None
     if kwargs["type"].lower().startswith("comparative"):
-      trainer.train_comparative(student_generator)
-      stats["comparative"] = True
+      trainer.train_comparative(
+          student_generator,
+          export_only=stats["comparative"] or kwargs["export_only"])
+      if not kwargs["export_only"]:
+        stats["comparative"] = True
     elif kwargs["type"].lower().startswith("adversarial"):
-      trainer.train_adversarial(student_generator)
-      stats["adversarial"] = True
+      trainer.train_adversarial(
+          student_generator,
+          export_only=stats["adversarial"] or kwargs["export_only"])
+      if not kwargs["export_only"]:
+        stats["adversarial"] = True
   # Tracing Graph to put input signature
   _ = student_generator(
-      tf.random.normal([None, 180, 270, 3]))
+      tf.random.normal([1, 180, 270, 3]))
   tf.saved_model.save(
       student_generator,
       os.path.join(
@@ -104,6 +110,11 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("--tpu", default=None, help="Name of the TPU to use")
   parser.add_argument("--logdir", default=None, help="Path to log directory")
+  parser.add_argument(
+      "--export_only",
+      default=False,
+      action="store_true",
+      help="Do not train, only export the model")
   parser.add_argument(
       "--config",
       default="config/config.yaml",
