@@ -4,10 +4,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-
 from absl import logging
-from functools import partial
 from libs import dataset
 from libs import settings
 from libs import utils
@@ -38,7 +35,6 @@ class Trainer(object):
         raw_data: Indicate if data_dir contains Raw Data or TFRecords.
         model_dir: Location to store checkpoints and SavedModel directory.
     """
-    assert(isinstance(strategy, tf.distribute.Strategy))
     self.teacher_generator = teacher
     self.teacher_discriminator = discriminator
     self.teacher_settings = settings.Settings(use_student_settings=False)
@@ -192,7 +188,30 @@ class Trainer(object):
     generator_metric = tf.keras.metrics.Mean()
     discriminator_metric = tf.keras.metrics.Mean()
     generator_optimizer = tf.optimizers.Adam()
+    dummy_optimizer = tf.optimizers.Adam()
     discriminator_optimizer = tf.optimizers.Adam()
+    status = None
+    if not utils.checkpoint_exists(
+            names="adversarial_checkpoint",
+            basepath=self.model_dir,
+            use_student_settings=True):
+      if export_only:
+        raise ValueError("Checkpoint for this phase not found")
+      if utils.checkpoint_exists(
+              names="comparative_checkpoint",
+              basepath=self.model_dir,
+              use_student_settings=True):
+        hot_start = tf.train.Checkpoint(
+            student_generator=student,
+            student_optimizer=dummy_optimizer,
+            summary_step=tf.summary.experimental.get_step())
+        status = utils.load_checkpoint(
+            hot_start,
+            "comparative_checkpoint",
+            basepath=self.model_dir,
+            use_student_settings=True)
+        # resetting summary step
+        tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     checkpoint = tf.train.Checkpoint(
         student_generator=student,
         student_optimizer=generator_optimizer,
@@ -200,13 +219,15 @@ class Trainer(object):
         teacher_generator=self.teacher_generator,
         teacher_discriminator=self.teacher_discriminator,
         summary_step=tf.summary.experimental.get_step())
-    status = utils.load_checkpoint(
-        checkpoint,
-        "adversarial_checkpoint",
-        basepath=self.model_dir,
-        use_student_settings=True)
-    if export_only:
-      return
+    if not status:
+      status = utils.load_checkpoint(
+          checkpoint,
+          "adversarial_checkpoint",
+          basepath=self.model_dir,
+          use_student_settings=True)
+      if export_only:
+        return
+
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
 
@@ -246,7 +267,9 @@ class Trainer(object):
           zip(discriminator_gradient, teacher_vars))
       generator_metric(generator_loss)
       discriminator_metric(discriminator_loss)
-      return tf.cast(discriminator_optimizer.iterations, tf.float32)
+      with tf.control_dependencies(
+              [generator_op, discriminator_op]):
+        return tf.cast(discriminator_optimizer.iterations, tf.float32)
 
     @tf.function
     def train_step(image_lr, image_hr):
@@ -260,8 +283,9 @@ class Trainer(object):
       distributed_metric = self.strategy.experimental_run_v2(
           step_fn,
           args=(image_lr, image_hr))
-      mean_metric = self.strategy.reduce(tf.distribute.ReduceOp.MEAN,
-                                         distributed_metric, axis=None)
+      mean_metric = self.strategy.reduce(
+          tf.distribute.ReduceOp.MEAN,
+          distributed_metric, axis=None)
       return mean_metric
 
     logging.info("Starting Adversarial Training")

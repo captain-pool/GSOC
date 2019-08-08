@@ -49,19 +49,24 @@ def train_and_export(**kwargs):
   lazy.import_("teacher_imports", parent="libs", return_=False)
   lazy.import_("teacher", parent="libs.models", return_=False)
   lazy.import_("train", parent="libs", return_=False)
+  lazy.import_("utils", parent="libs", return_=False)
   globals().update(lazy.import_dict)
 
   teacher_settings = settings.Settings(
       student_settings["teacher_config"], use_student_settings=False)
   stats = settings.Stats(os.path.join(student_settings.path, "stats.yaml"))
+  strategy = utils.SingleDeviceStrategy()
 
-  cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
-      kwargs["tpu"])
-  tf.config.experimental_connect_to_host(cluster_resolver.get_master())
-  tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
-  strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
+  if kwargs["tpu"]:
+    cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
+        kwargs["tpu"])
+    tf.config.experimental_connect_to_host(cluster_resolver.get_master())
+    tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
+    strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
 
-  with tf.device("/job:worker"), strategy.scope():
+  device_name = utils.assign_to_worker(kwargs["tpu"])
+
+  with tf.device(device_name), strategy.scope():
     summary_writer = tf.summary.create_file_writer(
         os.path.join(kwargs["logdir"], "student"))
     teacher_summary_writer = tf.summary.create_file_writer(

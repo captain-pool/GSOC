@@ -212,11 +212,18 @@ class SingleDeviceStrategy(object):
   def __exit__(self, *args, **kwargs):
     pass
 
-  def scope(self):
-    return self
+  def experimental_distribute_dataset(dataset, *args, **kwargs):
+    return dataset
 
   def experimental_run_v2(self, fn, args, kwargs):
     return fn(*args, **kwargs)
+
+  def reduce(reduction_type, distributed_data, axis):
+    return distributed_data
+
+  def scope(self):
+    return self
+
 
 # Model Utils
 
