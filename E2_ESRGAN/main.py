@@ -47,6 +47,8 @@ def main(**kwargs):
 
   strategy = utils.SingleDeviceStrategy()
   scope = utils.assign_to_worker(kwargs["tpu"])
+  sett = settings.Settings(kwargs["config"])
+  Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
   if kwargs["tpu"]:
     cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
         kwargs["tpu"])
@@ -54,41 +56,40 @@ def main(**kwargs):
     tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
     strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
   with tf.device(scope), strategy.scope():
-    sett = settings.Settings(kwargs["config"])
-    Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
     summary_writer = tf.summary.create_file_writer(kwargs["log_dir"])
     # profiler.start_profiler_server(6009)
     generator = model.RRDBNet(out_channel=3)
     discriminator = model.VGGArch(batch_size=sett["batch_size"])
-    training = train.Trainer(
-        summary_writer=summary_writer,
-        settings=sett,
-        model_dir=kwargs["model_dir"],
-        data_dir=kwargs["data_dir"],
-        manual=kwargs["manual"],
-        strategy=strategy)
-    phases = list(map(lambda x: x.strip(),
-                      kwargs["phases"].lower().split("_")))
+    if not kwargs["export_only"]:
+      training = train.Trainer(
+          summary_writer=summary_writer,
+          settings=sett,
+          model_dir=kwargs["model_dir"],
+          data_dir=kwargs["data_dir"],
+          manual=kwargs["manual"],
+          strategy=strategy)
+      phases = list(map(lambda x: x.strip(),
+                        kwargs["phases"].lower().split("_")))
+      if not Stats["train_step_1"] and "phase1" in phases:
+        logging.info("starting phase 1")
+        training.warmup_generator(generator)
+        Stats["train_step_1"] = True
+      if not Stats["train_step_2"] and "phase2" in phases:
+        logging.info("starting phase 2")
+        training.train_gan(generator, discriminator)
+        Stats["train_step_2"] = True
 
-    if not Stats["train_step_1"] and "phase1" in phases:
-      logging.info("starting phase 1")
-      training.warmup_generator(generator)
-      Stats["train_step_1"] = True
-    if not Stats["train_step_2"] and "phase2" in phases:
-      logging.info("starting phase 2")
-      training.train_gan(generator, discriminator)
-      Stats["train_step_2"] = True
-
-    if Stats["train_step_1"] and Stats["train_step_2"]:
-      # Attempting to save "Interpolated" Model as SavedModel2.0
-      interpolated_generator = utils.interpolate_generator(
-          partial(model.RRDBNet, out_channel=3),
-          discriminator,
-          sett["interpolation_parameter"],
-          sett["dataset"]["hr_dimension"])
-      tf.saved_model.save(
-          interpolated_generator, os.path.join(
-              kwargs["model_dir"], "esrgan"))
+  if Stats["train_step_1"] and Stats["train_step_2"]:
+    # Attempting to save "Interpolated" Model as SavedModel2.0
+    interpolated_generator = utils.interpolate_generator(
+        partial(model.RRDBNet, out_channel=3),
+        discriminator,
+        sett["interpolation_parameter"],
+        [720, 1080],
+        basepath=kwargs["model_dir"])
+    tf.saved_model.save(
+        interpolated_generator, os.path.join(
+            kwargs["model_dir"], "esrgan"))
 
 
 if __name__ == '__main__':
@@ -118,6 +119,11 @@ if __name__ == '__main__':
       "--phases",
       default="phase1_phase2",
       help="phases to train for seperated by '_'")
+  parser.add_argument(
+      "--export_only",
+      default=False,
+      action="store_true",
+      help="Exports to SavedModel")
   parser.add_argument(
       "--tpu",
       default="",

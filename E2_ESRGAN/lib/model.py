@@ -57,7 +57,7 @@ class RRDBNet(tf.keras.Model):
 
   @tf.function(
       input_signature=[
-          tf.TensorSpec(shape=[None, None, None, 3],
+          tf.TensorSpec(shape=[None, 180, 270, 3],
                         dtype=tf.float32)])
   def call(self, inputs):
     return self.unsigned_call(inputs)
@@ -82,8 +82,7 @@ class VGGArch(tf.keras.Model):
         output_shape (default: 1): output_shape of the generator
         num_features (default: 64): number of features to be used in the convolutional layers
                                     a factor of 2**i will be multiplied as per the need
-        use
-
+        use_bias (default: True): Boolean to indicate whether to use biases for convolution layers
   """
 
   def __init__(

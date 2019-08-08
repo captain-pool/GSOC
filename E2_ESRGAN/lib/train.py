@@ -42,7 +42,9 @@ class Trainer(object):
           tfrecord_path=data_dir,
           lr_size=lr_size,
           hr_size=hr_size).repeat().batch(self.batch_size, drop_remainder=True)
-      self.dataset = iter(strategy.experimental_distribute_dataset(self.dataset))
+      self.dataset = iter(
+          strategy.experimental_distribute_dataset(
+              self.dataset))
     else:
       if not manual:
         self.dataset = iter(dataset.load_dataset(
@@ -149,7 +151,8 @@ class Trainer(object):
         G_optimizer.learning_rate.assign(
             G_optimizer.learning_rate * decay_factor)
         logging.debug(
-            "Decayed Learning Rate by %f. Current Learning Rate %s" % (
+            "Decayed Learning Rate by %f."
+            "Current Learning Rate %s" % (
                 decay_factor, G_optimizer.learning_rate))
       with self.summary_writer.as_default():
         tf.summary.scalar(
@@ -159,7 +162,8 @@ class Trainer(object):
 
       if not num_steps % self.settings["print_step"]:
         logging.info(
-            "[WARMUP] Step: {}\tGenerator Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
+            "[WARMUP] Step: {}\tGenerator Loss: {}"
+            "\tPSNR: {}\tTime Taken: {} sec".format(
                 num_steps,
                 metric,
                 psnr_metric,
@@ -241,7 +245,8 @@ class Trainer(object):
         percep_loss = perceptual_loss(image_hr, fake)
         l1_loss = utils.pixel_loss(image_hr, fake)
         loss_RaG = ra_gen(image_hr, fake)
-        logging.debug("RA Generator")
+        logging.debug("Calculating Relativistic"
+                      "Averate Loss for Generator")
         disc_loss = ra_disc(image_hr, fake)
         logging.debug("RA Discriminator")
         gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
@@ -256,25 +261,21 @@ class Trainer(object):
                     fake,
                     image_hr,
                     max_val=256.0)))
-      # gen_vars = list(set(generator.trainable_variables))
-      # disc_vars = list(set(discriminator.trainable_variables))
-      # Debug-Aug6-3-08-PM
-      # tf.print(len(gen_vars), len(disc_vars),
-      #         tf.print(gen_loss), tf.print(disc_loss))
       disc_grad = disc_tape.gradient(
           disc_loss, discriminator.trainable_variables)
-      logging.debug("Discriminator Gradient")
+      logging.debug("Calculating gradient for Discriminator")
       gen_grad = gen_tape.gradient(
           gen_loss, generator.trainable_variables)
-      logging.debug("Generator Gradient")
+      logging.debug("Calculating gradient for Generator")
       G_optimizer.apply_gradients(
           zip(gen_grad, generator.trainable_variables))
-      logging.debug("Generator Apply")
+      logging.debug("Applying gradients to Generator")
       D_optimizer.apply_gradients(
           zip(disc_grad, discriminator.trainable_variables))
-      logging.debug("Discriminator Apply")
+      logging.debug("Applying gradients to Discriminator")
 
       return tf.cast(D_optimizer.iterations, tf.float32)
+
     @tf.function
     def train_step(image_lr, image_hr):
       distributed_iterations = self.strategy.experimental_run_v2(
@@ -330,7 +331,8 @@ class Trainer(object):
       # Logging and Checkpointing
       if not step % self.settings["print_step"]:
         logging.info(
-            "Step: {}\tGen Loss: {}\tDisc Loss: {}\tPSNR: {}\tTime Taken: {} sec".format(
+            "Step: {}\tGen Loss: {}\tDisc Loss: {}"
+            "\tPSNR: {}\tTime Taken: {} sec".format(
                 num_step,
                 gen_metric.result(),
                 disc_metric.result(),

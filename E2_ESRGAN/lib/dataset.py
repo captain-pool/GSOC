@@ -20,6 +20,7 @@ def scale_down(method="bicubic", dimension=256, size=None, factor=4):
   if not size:
     size = (dimension, dimension)
   size_ = {"size": size}
+
   def scale_fn(image, *args, **kwargs):
     size = size_["size"]
     high_resolution = image
@@ -116,10 +117,12 @@ def reform_dataset(dataset, types, size, num_elems=None):
         dataset: Source dataset(image-label dataset) to convert.
         types: tuple / list of target datatype.
         size: [height, width] threshold of the images.
+        num_elems: Number of Data points to store
       Returns:
         tf.data.Dataset with the images of dimension >= Args.size and types = Args.types
   """
-  _carrier={"num_elems": num_elems}
+  _carrier = {"num_elems": num_elems}
+
   def generator_fn():
     for idx, data in enumerate(dataset, 1):
       if _carrier["num_elems"]:
@@ -166,6 +169,7 @@ def load_dataset_directory(
           augment: Boolean to indicate if data is to augmented.
           cache_dir: Cache directory to save the data to.
           buffer_size: size of shuffle buffer to use.
+          num_elems: Number of elements to iterate over in the dataset.
       Returns:
           A tf.data.Dataset having data as (low_resolution, high_resoltion)
   """
@@ -185,11 +189,13 @@ def load_dataset_directory(
       num_elems=num_elems)
   if options:
     dataset.with_options(options)
-  dataset = dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  dataset = dataset.map(
+      low_res_map_fn,
+      num_parallel_calls=tf.data.experimental.AUTOTUNE)
   if batch_size:
     dataset = dataset.batch(batch_size)
   dataset = dataset.prefetch(buffer_size)
-            #.cache(cache_dir))
+  # .cache(cache_dir))
 
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
@@ -227,6 +233,7 @@ def load_dataset(
           buffer_size: size of shuffle buffer to use.
           cache_dir: Cache directory to save the data to.
           data_dir: Directory to save the downloaded dataset to.
+          num_elems: Number of elements to iterate over in the dataset.
       Returns:
           A tf.data.Dataset having data as (low_resolution, high_resoltion)
 
@@ -244,11 +251,13 @@ def load_dataset(
       num_elems=num_elems)
   if options:
     dataset.with_options(options)
-  dataset = dataset.map(low_res_map_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  dataset = dataset.map(
+      low_res_map_fn,
+      num_parallel_calls=tf.data.experimental.AUTOTUNE)
   if batch_size:
     dataset = dataset.batch(batch_size)
   dataset = dataset.prefetch(buffer_size)
-             #.cache(cache_dir))
+  # .cache(cache_dir))
 
   if shuffle:
     dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
@@ -261,8 +270,20 @@ def load_dataset(
         num_parallel_calls=tf.data.experimental.AUTOTUNE)
   return dataset
 
-def load_tfrecord_dataset(tfrecord_path, lr_size, hr_size):
+
+def load_tfrecord_dataset(
+        tfrecord_path, lr_size, hr_size,
+        shuffle=True, shuffle_buffer=128):
+  """ Loads TFRecords for feeding to ESRGAN
+      Args:
+        tfrecord_path: Path to load .tfrecord files from.
+        lr_size: size of the low_resolution images.
+        hr_size: size of the high resolution images.
+        shuffle: Boolean to indicate if the data will be shuffled(default: True)
+        shuffle_buffer: Size of the shuffle buffer to use (default: 128)
+  """
   def _parse_tf_record(serialized_example):
+    """ Parses Single Serialized Tensor from TFRecord """
     features = {
         "low_res_image": tf.io.FixedLenFeature([], dtype=tf.string),
         "high_res_image": tf.io.FixedLenFeature([], dtype=tf.string)}
@@ -277,7 +298,7 @@ def load_tfrecord_dataset(tfrecord_path, lr_size, hr_size):
     hr_image = tf.reshape(hr_image, hr_size)
     return lr_image, hr_image
   files = tf.io.gfile.glob(
-          os.path.join(tfrecord_path, "*.tfrecord"))
+      os.path.join(tfrecord_path, "*.tfrecord"))
   if len(files) == 0:
     raise ValueError("Path Doesn't contain any file")
   ds = tf.data.TFRecordDataset(files).map(_parse_tf_record)
@@ -285,4 +306,6 @@ def load_tfrecord_dataset(tfrecord_path, lr_size, hr_size):
     option = tf.data.Options()
     option.auto_shard = False
     ds.with_options(ds)
-  return ds.shuffle(128, reshuffle_each_iteration=True)
+  if shuffle:
+    ds = ds.shuffle(shuffle_buffer, reshuffle_each_iteration=True)
+  return ds

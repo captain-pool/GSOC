@@ -70,7 +70,7 @@ class Trainer(object):
       checkpoint = tf.train.Checkpoint(
           G=self.teacher_generator,
           D=self.teacher_discriminator)
-      self.__checkstat = utils.load_checkpoint(
+      utils.load_checkpoint(
           checkpoint,
           "phase_2",
           basepath=model_dir,
@@ -110,11 +110,13 @@ class Trainer(object):
       """
       with tf.GradientTape() as tape:
         teacher_fake = self.teacher_generator.unsigned_call(image_lr)
+        teacher_fake = tf.clip_by_value(teacher_fake, 0, 255)
         student_fake = student.unsigned_call(image_lr)
-        psnr = tf.image.psnr(student_fake, image_hr, max_val=256.0)
-        student_psnr(tf.reduce_mean(psnr) * (1.0 / self.batch_size))
-        psnr = tf.image.psnr(teacher_fake, image_hr, max_val=256.0)
-        teacher_psnr(tf.reduce_mean(psnr) * (1.0 / self.batch_size))
+        student_fake = tf.clip_by_value(student_fake, 0, 255)
+        psnr = tf.image.psnr(student_fake, image_hr, max_val=255.0)
+        student_psnr(tf.reduce_mean(psnr))
+        psnr = tf.image.psnr(teacher_fake, image_hr, max_val=255.0)
+        teacher_psnr(tf.reduce_mean(psnr))
         loss = loss_fn(teacher_fake, student_fake)
         loss = tf.reduce_mean(loss) * (1.0 / self.batch_size)
         metric_fn(loss)
@@ -134,17 +136,16 @@ class Trainer(object):
           image_lr: Distributed batch of Low Resolution Images
           image_hr: Distributed batch of High Resolution Images
       """
-      distribute_metric = self.strategy.experimental_run_v2(
+      distributed_metric = self.strategy.experimental_run_v2(
           step_fn, args=(image_lr, image_hr))
       mean_metric = self.strategy.reduce(
-          tf.distribute.ReduceOp.MEAN, distributed_metric)
+          tf.distribute.ReduceOp.MEAN, distributed_metric, axis=None)
       return mean_metric
     logging.info("Starting comparative loss training")
     while True:
       image_lr, image_hr = next(self.dataset)
       step = tf.summary.experimental.get_step()
       num_steps = train_step(image_lr, image_hr)
-      self.__checkstat.assert_consumed()
       if num_steps >= total_steps:
         return
       if status:
@@ -153,7 +154,7 @@ class Trainer(object):
         status = None
       # Writing Summary
       with self.summary_writer.as_default():
-        tf.summary.scalar("loss", metric_fn.result(), step=step)
+        tf.summary.scalar("student_loss", metric_fn.result(), step=step)
         tf.summary.scalar("psnr", student_psnr.result(), step=step)
       if self.summary_writer_2:
         with self.summary_writer_2.as_default():
@@ -214,9 +215,11 @@ class Trainer(object):
       """
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         student_fake = student.unsigned_call(image_lr)
+        student_fake = tf.clip_by_value(student_fake, 0, 255)
         psnr = tf.image.psnr(image_hr, student_fake, max_val=255)
         student_psnr(psnr)
         teacher_fake = self.teacher_generator.unsigned_call(image_lr)
+        teacher_fake = tf.clip_by_value(teacher_fake, 0, 255)
         psnr = tf.image.psnr(image_hr, teacher_fake, max_val=255)
         teacher_psnr(psnr)
         student_ra_loss = ra_generator(image_hr, student_fake)
@@ -254,7 +257,7 @@ class Trainer(object):
           step_fn,
           args=(image_lr, image_hr))
       mean_metric = self.strategy.reduce(tf.distribute.ReduceOp.MEAN,
-                                         distributed_metric)
+                                         distributed_metric, axis=None)
       return mean_metric
 
     logging.info("Starting Adversarial Training")
@@ -263,7 +266,6 @@ class Trainer(object):
       image_lr, image_hr = next(self.dataset)
       step = tf.summary.experimental.get_step()
       num_steps = train_step(image_lr, image_hr)
-      self.__checkstat.assert_consumed()
       if num_steps >= total_steps:
         return
       if status:
@@ -287,7 +289,7 @@ class Trainer(object):
         logging.info(
             "[ADVERSARIAL] Step: %s\tStudent Loss: %s\t"
             "Discriminator Loss: %s" %
-            (step, generator_metric.result(),
+            (num_steps, generator_metric.result(),
             discriminator_metric.result()))
       step.assign_add(1)
       # Setting Up Checkpoint

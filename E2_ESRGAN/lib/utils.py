@@ -6,6 +6,8 @@ from lib import settings
 
 """ Utility functions needed for training ESRGAN model. """
 
+# Checkpoint Utilities
+
 
 def save_checkpoint(checkpoint, training_phase, basepath=""):
   """ Saves checkpoint.
@@ -13,6 +15,7 @@ def save_checkpoint(checkpoint, training_phase, basepath=""):
         checkpoint: tf.train.Checkpoint object
         training_phase: The training phase of the model to load/store the checkpoint for.
                         can be one of the two "phase_1" or "phase_2"
+        basepath: Base path to load checkpoints from.
   """
   dir_ = settings.Settings()["checkpoint_path"][training_phase]
   if basepath:
@@ -27,7 +30,7 @@ def load_checkpoint(checkpoint, training_phase, basepath=""):
         checkpoint: tf.train.Checkpoint object
         training_phase: The training phase of the model to load/store the checkpoint for.
                         can be one of the two "phase_1" or "phase_2"
-        assert_consumed: assert all the restored variables are consumed in the model
+        basepath: Base Path to load checkpoints from.
   """
   logging.info("Loading check point for: %s" % training_phase)
   dir_ = settings.Settings()["checkpoint_path"][training_phase]
@@ -38,13 +41,16 @@ def load_checkpoint(checkpoint, training_phase, basepath=""):
     status = checkpoint.restore(tf.train.latest_checkpoint(dir_))
     return status
 
+# Network Interpolation utility
+
 
 def interpolate_generator(
         generator_fn,
         discriminator,
         alpha,
         dimension,
-        factor=4):
+        factor=4,
+        basepath=""):
   """ Interpolates between the weights of the PSNR model and GAN model
 
        Refer to Section 3.4 of https://arxiv.org/pdf/1809.00219.pdf (Xintao et. al.)
@@ -55,19 +61,23 @@ def interpolate_generator(
          alpha: interpolation parameter between both the weights of both the models.
          dimension: dimension of the high resolution image
          factor: scale factor of the model
+         basepath: Base directory to load checkpoints from.
        Returns:
          Keras model of a generator with weights interpolated between the PSNR and GAN model.
   """
   assert 0 <= alpha <= 1
+  size = dimension
+  if not tf.nest.is_nested(dimension):
+    size = [dimension, dimension]
   logging.debug("Interpolating generator. Alpha: %f" % alpha)
   optimizer = partial(tf.optimizers.Adam)
   gan_generator = generator_fn()
   psnr_generator = generator_fn()
   # building generators
   gan_generator(tf.random.normal(
-      [1, dimension // factor, dimension // factor, 3]))
+      [1, size[0] // factor, size[1] // factor, 3]))
   psnr_generator(tf.random.normal(
-      [1, dimension // factor, dimension // factor, 3]))
+      [1, size[0] // factor, size[1] // factor, 3]))
 
   phase_1_ckpt = tf.train.Checkpoint(
       G=psnr_generator, G_optimizer=optimizer())
@@ -76,14 +86,14 @@ def interpolate_generator(
       G_optimizer=optimizer(),
       D=discriminator,
       D_optimizer=optimizer())
-  load_checkpoint(phase_1_ckpt, "phase_1")
-  load_checkpoint(phase_2_ckpt, "phase_2")
+  load_checkpoint(phase_1_ckpt, "phase_1", basepath)
+  load_checkpoint(phase_2_ckpt, "phase_2", basepath)
 
   # Consuming Checkpoint
   gan_generator(tf.random.normal(
-      [1, dimension // factor, dimension // factor, 3]))
+      [1, size[0] // factor, size[1] // factor, 3]))
   psnr_generator(tf.random.normal(
-      [1, dimension // factor, dimension // factor, 3]))
+      [1, size[0] // factor, size[1] // factor, 3]))
 
   for variables_1, variables_2 in zip(
           gan_generator.trainable_variables, psnr_generator.trainable_variables):
@@ -91,12 +101,15 @@ def interpolate_generator(
 
   return gan_generator
 
+# Losses
+
 
 def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
   """ Perceptual Loss using VGG19
       Args:
         weights: Weights to be loaded.
         input_shape: Shape of input image.
+        loss_type: Loss type for features. (L1 / L2)
   """
   vgg_model = tf.keras.applications.VGG19(
       input_shape=input_shape, weights=weights, include_top=False)
@@ -112,7 +125,12 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
     y_true = tf.cast(y_true, tf.float32)
     y_pred = tf.cast(y_pred, tf.float32)
     if loss_type.lower() == "l1":
-      return tf.reduce_mean(tf.reduce_mean(tf.abs(phi(y_true) - phi(y_pred)), axis=0))
+      return tf.reduce_mean(
+          tf.reduce_mean(
+              tf.abs(
+                  phi(y_true) -
+                  phi(y_pred)),
+              axis=0))
     if loss_type.lower() == "l2":
       return tf.keras.losses.MSE(phi(y_true), phi(y_pred))
     raise ValueError(
@@ -185,19 +203,17 @@ def assign_to_worker(use_tpu):
   return ""
 
 
-class _DummyStrategy(object):
-  def __enter__(self):
-    pass
-
-  def __exit__(self):
-    pass
-
-
 class SingleDeviceStrategy(object):
   """ Dummy Strategy when Outside TPU """
 
+  def __enter__(self, *args, **kwargs):
+    pass
+
+  def __exit__(self, *args, **kwargs):
+    pass
+
   def scope(self):
-    return _DummyStrategy()
+    return self
 
   def experimental_run_v2(self, fn, args, kwargs):
     return fn(*args, **kwargs)
