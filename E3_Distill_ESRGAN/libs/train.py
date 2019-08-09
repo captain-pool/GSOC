@@ -43,7 +43,7 @@ class Trainer(object):
     self.strategy = strategy
     self.train_args = self.student_settings["train"]
     self.batch_size = self.teacher_settings["batch_size"]
-    self.hr_size = self.student_settings["hr_size"])
+    self.hr_size = self.student_settings["hr_size"]
     self.lr_size = tf.unstack(self.hr_size)[:-1]
     self.lr_size.append(tf.gather(self.hr_size, len(self.hr_size) - 1) * 4)
     self.lr_size = tf.stack(self.lr_size) // 4
@@ -200,7 +200,6 @@ class Trainer(object):
               use_student_settings=True):
         hot_start = tf.train.Checkpoint(
             student_generator=student,
-            student_optimizer=dummy_optimizer,
             summary_step=tf.summary.experimental.get_step())
         utils.load_checkpoint(
             hot_start,
@@ -233,7 +232,8 @@ class Trainer(object):
         loss_type="L2")
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
-
+    lambda_ = 0.005
+    eta = 0.02
     def expt_step_fn(image_lr, image_hr):
       """
         Function to be replicated among the worker nodes
@@ -255,7 +255,7 @@ class Trainer(object):
         disc_loss = ra_discriminator(image_hr, student_fake)
         # TODO (@captain-pool): Complete this
 
-    def original_step_fn(image_lr, image_hr):
+    def step_fn(image_lr, image_hr):
       """
         Function to be replicated among the worker nodes
         Args:
@@ -273,15 +273,17 @@ class Trainer(object):
         student_psnr(tf.reduce_mean(psnr))
         psnr = tf.image.psnr(teacher_fake, image_hr, max_val=255.0)
         teacher_psnr(tf.reduce_mean(psnr))
-        student_ra_loss = ra_generator(image_hr, student_fake)
+        student_ra_loss = ra_generator(teacher_fake, student_fake)
         logging.debug("Relativistic Average Loss: Student")
-        discriminator_loss = ra_discriminator(image_hr, student_fake)
+        discriminator_loss = ra_discriminator(teacher_fake, student_fake)
         discriminator_loss = tf.reduce_mean(
             discriminator_loss) * (1.0 / self.batch_size)
         logging.debug("Relativistic Average Loss: Teacher")
-        # mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
-        percep_loss = perceptual_loss(teacher_fake, student_fake)
-        generator_loss = alpha * student_ra_loss + (1 - alpha) * percep_loss
+        mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
+        # teacher_percep_loss = perceptual_loss(teacher_fake, student_fake)
+        percep_loss = perceptual_loss(image_hr, student_fake)
+        # percep_loss = teacher_percep_loss + real_percep_loss
+        generator_loss = lambda_ * student_ra_loss + percep_loss + eta * mse_loss
         logging.debug("Calculated Joint Loss for Generator")
         generator_loss = tf.reduce_mean(
             generator_loss) * (1.0 / self.batch_size)
@@ -329,14 +331,22 @@ class Trainer(object):
       if status:
         status.assert_consumed()
         status = None
-      for decay_step in decay_steps.copy():
-        if decay_step <= num_steps:
-          decay_steps.pop(0)
+      if not isinstance(decay_steps, list):
+        if not num_steps % decay_steps:
           logging.debug("Decaying Learning Rate by: %s" % decay_rate)
           generator_optimizer.learning_rate.assign(
               generator_optimizer.learning_rate * decay_rate)
           discriminator_optimizer.learning_rate.assign(
               discriminator_optimizer.learning_rate * decay_rate)
+      else:
+        for decay_step in decay_steps.copy():
+          if decay_step <= num_steps:
+            decay_steps.pop(0)
+            logging.debug("Decaying Learning Rate by: %s" % decay_rate)
+            generator_optimizer.learning_rate.assign(
+                generator_optimizer.learning_rate * decay_rate)
+            discriminator_optimizer.learning_rate.assign(
+                discriminator_optimizer.learning_rate * decay_rate)
       # Setting Up Logging
       with self.summary_writer.as_default():
         tf.summary.scalar(

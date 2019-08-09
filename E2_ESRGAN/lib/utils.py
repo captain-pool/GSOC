@@ -113,7 +113,6 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
   """
   vgg_model = tf.keras.applications.VGG19(
       input_shape=input_shape, weights=weights, include_top=False)
-  logging.debug("Perceptual Loss Weight: ", weights)
   for layer in vgg_model.layers:
     layer.trainable = False
   phi = tf.keras.Model(

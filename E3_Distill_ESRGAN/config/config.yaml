@@ -11,9 +11,10 @@ train:
   print_step: 100
   num_steps: 10000
   checkpoint_step: 100
-  decay_rate: 0.5
+  decay_rate: 0.8
   decay_steps:
-    - 6100
+    - 1000
+    - 5000
     - 9000
     - 13500
   balance_factor: 0.2 # alpha of Adversarial Training
@@ -33,9 +34,9 @@ student_config:
   rrdb_student:
     rdb_config:
       depth: 3
-      residual_scale_beta: 0.2
+      residual_scale_beta: 0.3
     rrdb_config:
       rdb_units: 2
-      residual_scale_beta: 0.2
+      residual_scale_beta: 0.3
     trunk_size: 3
     growth_channels: 32
