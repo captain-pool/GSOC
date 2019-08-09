@@ -43,13 +43,17 @@ class Trainer(object):
     self.strategy = strategy
     self.train_args = self.student_settings["train"]
     self.batch_size = self.teacher_settings["batch_size"]
+    self.hr_size = self.student_settings["hr_size"])
+    self.lr_size = tf.unstack(self.hr_size)[:-1]
+    self.lr_size.append(tf.gather(self.hr_size, len(self.hr_size) - 1) * 4)
+    self.lr_size = tf.stack(self.lr_size) // 4
     self.summary_writer = summary_writer
     self.summary_writer_2 = summary_writer_2
     # Loading TFRecord Dataset
     self.dataset = dataset.load_dataset(
         data_dir,
-        lr_size=[64, 64, 3],
-        hr_size=[256, 256, 3])
+        lr_size=self.lr_size,
+        hr_size=self.hr_size)
     self.dataset = (
         self.dataset.repeat()
         .batch(self.batch_size, drop_remainder=True)
@@ -176,10 +180,6 @@ class Trainer(object):
     decay_rate = self.train_args["decay_rate"]
     if not tf.summary.experimental.get_step():
       tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
-    ra_generator = utils.RelativisticAverageLoss(
-        self.teacher_discriminator, type_="G")
-    ra_discriminator = utils.RelativisticAverageLoss(
-        self.teacher_discriminator, type_="D")
     loss_fn = tf.keras.losses.MeanSquaredError(reduction="none")
     alpha = self.train_args["balance_factor"]
     generator_metric = tf.keras.metrics.Mean()
@@ -194,21 +194,21 @@ class Trainer(object):
             use_student_settings=True):
       if export_only:
         raise ValueError("Checkpoint for this phase not found")
-#      if utils.checkpoint_exists(
-#              names="comparative_checkpoint",
-#              basepath=self.model_dir,
-#              use_student_settings=True):
-#        hot_start = tf.train.Checkpoint(
-#            student_generator=student,
-#            student_optimizer=dummy_optimizer,
-#            summary_step=tf.summary.experimental.get_step())
-#        utils.load_checkpoint(
-#            hot_start,
-#            "comparative_checkpoint",
-#            basepath=self.model_dir,
-#            use_student_settings=True)
-#        # resetting summary step
-#        tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
+      if utils.checkpoint_exists(
+              names="comparative_checkpoint",
+              basepath=self.model_dir,
+              use_student_settings=True):
+        hot_start = tf.train.Checkpoint(
+            student_generator=student,
+            student_optimizer=dummy_optimizer,
+            summary_step=tf.summary.experimental.get_step())
+        utils.load_checkpoint(
+            hot_start,
+            "comparative_checkpoint",
+            basepath=self.model_dir,
+            use_student_settings=True)
+        # resetting summary step
+        tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     checkpoint = tf.train.Checkpoint(
         student_generator=student,
         student_optimizer=generator_optimizer,
@@ -223,11 +223,39 @@ class Trainer(object):
         use_student_settings=True)
     if export_only and status:
       return
-
+    ra_generator = utils.RelativisticAverageLoss(
+        self.teacher_discriminator, type_="G")
+    ra_discriminator = utils.RelativisticAverageLoss(
+        self.teacher_discriminator, type_="D")
+    perceptual_loss = utils.PerceptualLoss(
+        weights="imagenet",
+        input_shape=self.hr_size,
+        loss_type="L2")
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
 
-    def step_fn(image_lr, image_hr):
+    def expt_step_fn(image_lr, image_hr):
+      """
+        Function to be replicated among the worker nodes
+        Args:
+          image_lr: Distributed Batch of Low Resolution Images.
+          image_hr: Distributed Batch of High Resolution Images.
+      """
+      with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
+        teacher_fake = self.teacher_generator.unsigned_call(image_lr)
+        teacher_fake = tf.clip_by_value(teacher_fake, 0, 255)
+        logging.debug("Fetched Fake: Teacher")
+        student_fake = student.unsigned_call(image_lr)
+        student_fake = tf.clip_by_value(student_fake, 0, 255)
+        logging.debug("Fetched Fake: Student")
+        psnr = tf.image.psnr(student_fake, image_hr, max_val=255.0)
+        student_psnr(tf.reduce_mean(psnr))
+        psnr = tf.image.psnr(teacher_fake, image_hr, max_val=255.0)
+        teacher_psnr(tf.reduce_mean(psnr))
+        disc_loss = ra_discriminator(image_hr, student_fake)
+        # TODO (@captain-pool): Complete this
+
+    def original_step_fn(image_lr, image_hr):
       """
         Function to be replicated among the worker nodes
         Args:
@@ -236,10 +264,10 @@ class Trainer(object):
       """
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         teacher_fake = self.teacher_generator.unsigned_call(image_lr)
-        logging.debug("Fetching Fake: Teacher")
+        logging.debug("Fetched Fake: Teacher")
         teacher_fake = tf.clip_by_value(teacher_fake, 0, 255)
         student_fake = student.unsigned_call(image_lr)
-        logging.debug("Fetching Fake: Student")
+        logging.debug("Fetched Fake: Student")
         student_fake = tf.clip_by_value(student_fake, 0, 255)
         psnr = tf.image.psnr(student_fake, image_hr, max_val=255.0)
         student_psnr(tf.reduce_mean(psnr))
@@ -251,23 +279,24 @@ class Trainer(object):
         discriminator_loss = tf.reduce_mean(
             discriminator_loss) * (1.0 / self.batch_size)
         logging.debug("Relativistic Average Loss: Teacher")
-        mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
-        generator_loss = alpha * student_ra_loss + (1 - alpha) * mse_loss
-        logging.debug("Calculating Joint Loss for Generator")
+        # mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
+        percep_loss = perceptual_loss(teacher_fake, student_fake)
+        generator_loss = alpha * student_ra_loss + (1 - alpha) * percep_loss
+        logging.debug("Calculated Joint Loss for Generator")
         generator_loss = tf.reduce_mean(
             generator_loss) * (1.0 / self.batch_size)
       generator_gradient = gen_tape.gradient(
           generator_loss, student.trainable_variables)
-      logging.debug("calculating gradient: generator")
+      logging.debug("calculated gradient: generator")
       discriminator_gradient = disc_tape.gradient(
           discriminator_loss, self.teacher_discriminator.trainable_variables)
-      logging.debug("calculating gradient: discriminator")
+      logging.debug("calculated gradient: discriminator")
       generator_op = generator_optimizer.apply_gradients(
           zip(generator_gradient, student.trainable_variables))
-      logging.debug("applying generator gradients")
+      logging.debug("applied generator gradients")
       discriminator_op = discriminator_optimizer.apply_gradients(
           zip(discriminator_gradient, self.teacher_discriminator.trainable_variables))
-      logging.debug("applying discriminator gradients")
+      logging.debug("applied discriminator gradients")
       generator_metric(generator_loss)
       discriminator_metric(discriminator_loss)
       with tf.control_dependencies(

@@ -6,6 +6,7 @@ from libs import settings
 import tensorflow as tf
 # Loading utilities from ESRGAN
 from lib.utils import assign_to_worker
+from lib.utils import PerceptualLoss
 from lib.utils import RelativisticAverageLoss
 from lib.utils import SingleDeviceStrategy
 

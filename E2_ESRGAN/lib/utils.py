@@ -132,7 +132,10 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
                   phi(y_pred)),
               axis=0))
     if loss_type.lower() == "l2":
-      return tf.keras.losses.MSE(phi(y_true), phi(y_pred))
+      return tf.reduce_mean(
+          tf.reduce_mean(
+              (phi(y_true) - phi(y_pred))**2,
+              axis=0))
     raise ValueError(
         "Loss Function: \"%s\" not defined for Perceptual Loss" %
         loss_type)

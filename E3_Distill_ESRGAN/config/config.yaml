@@ -5,7 +5,7 @@ checkpoint_path:
   comparative_checkpoint: "checkpoints/mse_checkpoints/"
   adversarial_checkpoint: "checkpoints/adversarial_checkpoints/"
 
-hr_size: [256, 256]
+hr_size: [256, 256, 3]
 train:
   iterations: 1
   print_step: 100
