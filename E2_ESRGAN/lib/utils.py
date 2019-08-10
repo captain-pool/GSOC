@@ -111,6 +111,7 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
         input_shape: Shape of input image.
         loss_type: Loss type for features. (L1 / L2)
   """
+  preprocess_input = tf.keras.applications.vgg19.preprocess_input
   vgg_model = tf.keras.applications.VGG19(
       input_shape=input_shape, weights=weights, include_top=False)
   for layer in vgg_model.layers:
@@ -123,8 +124,8 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
           vgg_model.get_layer("block5_conv4").output])
 
   def loss(y_true, y_pred):
-    y_true = tf.cast(y_true, tf.float32)
-    y_pred = tf.cast(y_pred, tf.float32)
+    y_true = preprocess_input(y_true)
+    y_pred = preprocess_input(y_pred)
     if loss_type.lower() == "l1":
       return tf.reduce_mean(
           tf.reduce_mean(
