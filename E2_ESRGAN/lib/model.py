@@ -96,6 +96,9 @@ class VGGArch(tf.keras.Model):
     conv = partial(
         tf.keras.layers.Conv2D,
         kernel_size=[3, 3], use_bias=use_bias, padding="same")
+    depthwise_conv = partial(
+        tf.keras.layers.DepthwiseConv2D,
+        kernel_size=[3, 3], use_bias=use_bias, padding="same")
     batch_norm = partial(tf.keras.layers.BatchNormalization)
     def no_batch_norm(x): return x
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
@@ -104,12 +107,12 @@ class VGGArch(tf.keras.Model):
     self._conv_layers = OrderedDict()
     self._batch_norm = OrderedDict()
     self._conv_layers["conv_0_0"] = conv(filters=num_features, strides=1)
-    self._conv_layers["conv_0_1"] = conv(filters=num_features, strides=2)
+    self._conv_layers["conv_0_1"] = depthwise_conv(strides=2)
     self._batch_norm["bn_0_1"] = no_batch_norm if batch_size < 256 else batch_norm()
     for i in range(1, 4):
       for j in range(1, 3):
-        self._conv_layers["conv_%d_%d" % (i, j)] = conv(
-            filters=2**i * num_features, strides=j)
+        self._conv_layers["conv_%d_%d" % (i, j)] = depthwise_conv(
+            depth_multiplier=(3 - j), strides=j)
         self._batch_norm["bn_%d_%d" % (
             i, j)] = no_batch_norm if batch_size < 256 else batch_norm()
 
