@@ -234,23 +234,28 @@ class Trainer(object):
     gen_metric = tf.keras.metrics.Mean()
     disc_metric = tf.keras.metrics.Mean()
     psnr_metric = tf.keras.metrics.Mean()
+    logging.debug("Loading Perceptual Model")
     perceptual_loss = utils.PerceptualLoss(
         weights="imagenet",
         input_shape=[hr_dimension, hr_dimension, 3],
         loss_type=phase_args["perceptual_loss_type"])
-
+    logging.debug("Loaded Model")
     def _step_fn(image_lr, image_hr):
+      logging.debug("Starting Distributed Step")
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         fake = generator.unsigned_call(image_lr)
+        logging.debug("Fetched Generator Fake")
         percep_loss = perceptual_loss(image_hr, fake)
+        logging.debug("Calculated Perceptual Loss")
         l1_loss = utils.pixel_loss(image_hr, fake)
+        logging.debug("Calculated Pixel Loss")
         loss_RaG = ra_gen(image_hr, fake)
-        logging.debug("Calculating Relativistic"
-                      "Averate Loss for Generator")
+        logging.debug("Calculated Relativistic"
+                      "Averate (RA) Loss for Generator")
         disc_loss = ra_disc(image_hr, fake)
-        logging.debug("RA Discriminator")
+        logging.debug("Calculated RA Loss Discriminator")
         gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
-        logging.debug("Generator Loss")
+        logging.debug("Calculated Generator Loss")
         gen_loss = gen_loss * (1.0 / self.batch_size)
         disc_loss = disc_loss * (1.0 / self.batch_size)
         disc_metric(disc_loss)
@@ -263,16 +268,16 @@ class Trainer(object):
                     max_val=256.0)))
       disc_grad = disc_tape.gradient(
           disc_loss, discriminator.trainable_variables)
-      logging.debug("Calculating gradient for Discriminator")
+      logging.debug("Calculated gradient for Discriminator")
       gen_grad = gen_tape.gradient(
           gen_loss, generator.trainable_variables)
-      logging.debug("Calculating gradient for Generator")
+      logging.debug("Calculated gradient for Generator")
       G_optimizer.apply_gradients(
           zip(gen_grad, generator.trainable_variables))
-      logging.debug("Applying gradients to Generator")
+      logging.debug("Applied gradients to Generator")
       D_optimizer.apply_gradients(
           zip(disc_grad, discriminator.trainable_variables))
-      logging.debug("Applying gradients to Discriminator")
+      logging.debug("Applied gradients to Discriminator")
 
       return tf.cast(D_optimizer.iterations, tf.float32)
 
@@ -287,6 +292,7 @@ class Trainer(object):
           axis=None)
       return num_steps
     start = time.time()
+    last_psnr = 0
     while True:
       image_lr, image_hr = next(self.dataset)
       step = tf.summary.experimental.get_step()
@@ -338,5 +344,7 @@ class Trainer(object):
                 disc_metric.result(),
                 psnr_metric.result(),
                 time.time() - start))
-        utils.save_checkpoint(checkpoint, "phase_2", self.model_dir)
+        if psnr_metric.result() > last_psnr:
+          last_psnr = psnr_metric.result()
+          utils.save_checkpoint(checkpoint, "phase_2", self.model_dir)
         start = time.time()

@@ -103,7 +103,6 @@ def interpolate_generator(
 
 # Losses
 
-
 def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
   """ Perceptual Loss using VGG19
       Args:
@@ -117,22 +116,20 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
   for layer in vgg_model.layers:
     layer.trainable = False
   # Removing Activation Function
-  model.get_layer("block5_conv4").activation = lambda x: x
+  vgg_model.get_layer("block5_conv4").activation = lambda x: x
   phi = tf.keras.Model(
       inputs=[vgg_model.input],
       outputs=[
           vgg_model.get_layer("block5_conv4").output])
 
   def loss(y_true, y_pred):
-    y_true = preprocess_input(y_true)
-    y_pred = preprocess_input(y_pred)
+    y_true = preprocess_input(y_true, mode="tf")
+    y_pred = preprocess_input(y_pred, mode="tf")
     if loss_type.lower() == "l1":
-      return tf.reduce_mean(
-          tf.reduce_mean(
-              tf.abs(
-                  phi(y_true) -
-                  phi(y_pred)),
-              axis=0))
+      abs_diff = tf.abs(phi(y_true) - phi(y_pred))
+      logging.debug(abs_diff)
+      mean = tf.reduce_mean(abs_diff)
+      return mean 
     if loss_type.lower() == "l2":
       return tf.reduce_mean(
           tf.reduce_mean(
