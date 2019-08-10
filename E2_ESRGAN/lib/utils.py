@@ -115,6 +115,8 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
       input_shape=input_shape, weights=weights, include_top=False)
   for layer in vgg_model.layers:
     layer.trainable = False
+  # Removing Activation Function
+  model.get_layer("block5_conv4").activation = lambda x: x
   phi = tf.keras.Model(
       inputs=[vgg_model.input],
       outputs=[
