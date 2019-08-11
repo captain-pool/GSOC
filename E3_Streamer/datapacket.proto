@@ -3,9 +3,11 @@ syntax = "proto2";
 // Packets
 message Metadata{
   required int32 duration = 1;
+  required int32 image_fps = 2;
+  required int32 audio_fps = 3;
+  repeated int32 dimension = 4;
 }
-message Frame{
-  required Metadata metadata = 1;
-  required bytes image = 2;
-  required bytes audio = 3;
+message FramePacket{
+  optional bytes video_frames = 3;
+  optional bytes audio_chunk = 4;
 }
