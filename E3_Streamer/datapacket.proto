@@ -1,0 +1,11 @@
+# Protobuf Packet Defination for
+# Video Transfer
+syntax = "proto2";
+message Metadata{
+  int32 length = 1;
+}
+message Frame{
+  required Metadata metadata = 1;
+  required bytes image = 2;
+  required bytes audio = 3;
+}
