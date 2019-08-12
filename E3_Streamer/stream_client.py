@@ -1,22 +1,24 @@
-import tensorflow as tf
+from __future__ import print_function
+import io
 import socket
+import threading
 import time
+
+from absl import logging
+import queue
 import numpy as np
 import datapacket_pb2
 import pyaudio as pya
-import io
-import threading
-import queue
-import numpy as np
 import pygame
-from pygame.locals import *
+import tensorflow as tf
+from pygame.locals import *  # pylint: disable=wildcard-import
 pygame.init()
 
 
 class Client(object):
-  SYN = sys.intern(b'SYN')
-  SYNACK = sys.intern(b'SYN/ACK')
-  ACK = sys.intern(b'ACK')
+  SYN = b'SYN'
+  SYNACK = b'SYN/ACK'
+  ACK = b'ACK'
 
   def __init__(self, ip, port):
     self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -28,7 +30,7 @@ class Client(object):
     self._video_thread = threading.Thread(
         target=self.write_to_stream, args=(False,))
     self._running = False
-    self.tolerance = 8  # Higher Tolerance Higher Frame Rate
+    self.tolerance = 30  # Higher Tolerance Higher Frame Rate
     self._lock = threading.Lock()
     pyaudio = pya.PyAudio()
     self._audio_stream = pyaudio.open(
@@ -40,38 +42,45 @@ class Client(object):
     self._socket.connect((ip, port))
     self.fetch_metadata()
 
-  def readpacket(self, buffersize=1024):
+  def readpacket(self, buffersize=2**30):
     buffer_ = io.BytesIO()
     done = False
     eof = False
     while not done:
       data = self._socket.recv(buffersize)
-      if data[-5:] == "<EOF>":
-        data = data[-5:]
+      if data:
+        logging.debug("Reading Stream: Buffer Size: %d" % buffersize)
+      if data[-5:] == b'<EOF>':
+        logging.debug("Found EOF")
+        data = data[:-5]
         eof = True
         done = True
-      if data[-5:] == "<END>":
-        data = data[-5:]
+      if data[-5:] == b'<END>':
+        logging.debug("Find End of Message")
+        data = data[:-5]
         done = True
       buffer_.write(data)
     buffer_.seek(0)
     return buffer_.read(), eof
 
   def fetch_metadata(self):
+    logging.debug("Sending SYN...")
     self._socket.send(b'SYN')
-    self._metadata.ParseFromString(self.readpacket(8))
+    logging.debug("Sent Syn. Awating Metadata")
+    data, eof = self.readpacket(8)
+    self._metadata.ParseFromString(data)
     dimension = self._metadata.dimension
-    self.screen = pygame.display.set_mode(dimension[:-1], 0, 32)
+    self.screen = pygame.display.set_mode(dimension[:-1][::-1], 0, 32)
 
   def fetch_video(self):
     data, eof = self.readpacket()
     framedata = datapacket_pb2.FramePacket()
-    framedata.ParseFromString(self.readpacket())
+    framedata.ParseFromString(data)
     frames = []
-    for frame in frame.video_frames:
+    for frame in framedata.video_frames:
       frames.append(self.parse_frames(frame, False))
-    self._audio_queue.put(frame.audio_chunk)
-    self._video_queue.put(frame.video_frames)
+    self._audio_queue.put(framedata.audio_chunk)
+    self._video_queue.put(frames)
     return eof
 
   def parse_frames(self, bytestring, superresolve=False):
@@ -83,7 +92,7 @@ class Client(object):
     return frame.numpy()
 
   def start(self):
-    with self.lock:
+    with self._lock:
       self._running = True
     if not self._audio_thread.isAlive():
       self._audio_thread.start()
@@ -106,10 +115,14 @@ class Client(object):
     while self._running:
       try:
         if isaudio:
-          audio_chunk = self._audio_queue.get(timeout=2)
+          if self._audio_queue.qsize() < 5:
+            continue
+          audio_chunk = self._audio_queue.get(timeout=10)
           self._audio_stream.write(audio_chunk)
         else:
-          for video_frame in self.video_queue.get(timeout=2):
+          if self._video_queue.qsize() < 5:
+            continue
+          for video_frame in self._video_queue.get(timeout=10):
             video_frame = pygame.surfarray.make_surface(
                 np.rot90(np.fliplr(video_frame)))
             self.screen.fill((0, 0, 2))
@@ -122,5 +135,6 @@ class Client(object):
 
 
 if __name__ == "__main__":
+  logging.set_verbosity(logging.DEBUG)
   client = Client("127.0.0.1", 8001)
   client.start()
