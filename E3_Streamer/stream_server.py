@@ -44,8 +44,7 @@ class StreamClient(object):
   def _video_second(self):
     def shrink_fn(image):
       image = tf.convert_to_tensor(image)
-      image = tf.cast(image, tf.float32)
-      return tf.io.serialize_tensor(image).numpy()
+      return image.numpy().tostring()
     frames = []
     for _ in range(int(self.metadata.video_fps)):
       frames.append(shrink_fn(next(self._video_iterator)))

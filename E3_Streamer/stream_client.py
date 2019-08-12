@@ -42,7 +42,7 @@ class Client(object):
     self._socket.connect((ip, port))
     self.fetch_metadata()
 
-  def readpacket(self, buffersize=2**30):
+  def readpacket(self, buffersize=2**32):
     buffer_ = io.BytesIO()
     done = False
     eof = False
@@ -84,7 +84,7 @@ class Client(object):
     return eof
 
   def parse_frames(self, bytestring, superresolve=False):
-    frame = tf.io.parse_tensor(bytestring, out_type=tf.float32)
+    frame = np.asarray(bytestring)
     if superresolve:
       # Perform super resolution here
       pass
