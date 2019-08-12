@@ -60,6 +60,16 @@ def main(**kwargs):
     # profiler.start_profiler_server(6009)
     generator = model.RRDBNet(out_channel=3)
     discriminator = model.VGGArch(batch_size=sett["batch_size"], num_features=16)
+    # Initiate Variables
+    logging.debug("Initiating Variables")
+    generator.unsigned_call(tf.random.normal(1, 180, 270, 3))
+    discriminator(tf.random.normal(1, 720, 1080, 3))
+    logging.debug("Scaling Variables")
+    for variable in generator.trainable_variables:
+      variable.assign(0.1 * variable)
+    for variable in discriminator.trainable_variables:
+      variable.assign(0.1 * variable)
+
     if not kwargs["export_only"]:
       training = train.Trainer(
           summary_writer=summary_writer,
