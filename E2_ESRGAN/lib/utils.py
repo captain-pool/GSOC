@@ -240,6 +240,8 @@ class RDB(tf.keras.layers.Layer):
         tf.keras.layers.Conv2D,
         out_features,
         kernel_size=[3, 3],
+        kernel_initializer="he_normal",
+        bias_initializer="he_normal",
         strides=[1, 1], padding="same", use_bias=bias)
     self._conv2d_layers = {
         "conv_1": _create_conv2d(),

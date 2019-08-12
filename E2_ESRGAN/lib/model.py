@@ -29,15 +29,19 @@ class RRDBNet(tf.keras.Model):
           self,
           out_channel,
           num_features=32,
-          trunk_size=3,
+          trunk_size=23,
           growth_channel=32,
           use_bias=True):
     super(RRDBNet, self).__init__()
     self.rrdb_block = partial(utils.RRDB, growth_channel)
-    conv = partial(tf.keras.layers.Conv2D, kernel_size=[3, 3],
-                   strides=[1, 1],
-                   padding="same",
-                   use_bias=use_bias)
+    conv = partial(
+        tf.keras.layers.Conv2D,
+        kernel_size=[3, 3],
+        kernel_initializer="he_normal",
+        bias_initializer="he_normal",
+        strides=[1, 1],
+        padding="same",
+        use_bias=use_bias)
     self.conv_first = conv(filters=num_features)
     self.rdb_trunk = tf.keras.Sequential(
         [self.rrdb_block() for _ in range(trunk_size)])
@@ -45,6 +49,8 @@ class RRDBNet(tf.keras.Model):
     # Upsample
     conv_transpose = partial(
         tf.keras.layers.Conv2DTranspose,
+        kernel_initializer="he_normal",
+        bias_initializer="he_normal",
         strides=2,
         kernel_size=3,
         padding="same")
@@ -95,15 +101,25 @@ class VGGArch(tf.keras.Model):
     super(VGGArch, self).__init__()
     conv = partial(
         tf.keras.layers.Conv2D,
+        kernel_initializer="he_normal",
+        bias_initializer="he_normal",
         kernel_size=[3, 3], use_bias=use_bias, padding="same")
     depthwise_conv = partial(
         tf.keras.layers.DepthwiseConv2D,
+        depthwise_initializer="he_normal",
+        bias_initializer="he_normal",
         kernel_size=[3, 3], use_bias=use_bias, padding="same")
     batch_norm = partial(tf.keras.layers.BatchNormalization)
     def no_batch_norm(x): return x
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
-    self._dense_1 = tf.keras.layers.Dense(1024)
-    self._dense_2 = tf.keras.layers.Dense(output_shape)
+    self._dense_1 = tf.keras.layers.Dense(
+        1024,
+        kernel_initializer="he_normal",
+        bias_initializer="he_normal")
+    self._dense_2 = tf.keras.layers.Dense(
+        output_shape,
+        kernel_initializer="he_normal",
+        bias_initializer="he_normal")
     self._conv_layers = OrderedDict()
     self._batch_norm = OrderedDict()
     self._conv_layers["conv_0_0"] = conv(filters=num_features, strides=1)
