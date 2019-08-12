@@ -151,10 +151,10 @@ class Trainer(object):
       # Writing Summary
       with self.summary_writer.as_default():
         tf.summary.scalar("student_loss", metric_fn.result(), step=step)
-        tf.summary.scalar("psnr", student_psnr.result(), step=step)
+        tf.summary.scalar("mean_psnr", student_psnr.result(), step=step)
       if self.summary_writer_2:
         with self.summary_writer_2.as_default():
-          tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
+          tf.summary.scalar("mean_psnr", teacher_psnr.result(), step=step)
 
       if not step % self.train_args["print_step"]:
         logging.info("[COMPARATIVE LOSS] Step: %s\tLoss: %s" %
@@ -233,27 +233,7 @@ class Trainer(object):
     student_psnr = tf.keras.metrics.Mean()
     teacher_psnr = tf.keras.metrics.Mean()
     lambda_ = 0.005
-    eta = 0.02
-    def expt_step_fn(image_lr, image_hr):
-      """
-        Function to be replicated among the worker nodes
-        Args:
-          image_lr: Distributed Batch of Low Resolution Images.
-          image_hr: Distributed Batch of High Resolution Images.
-      """
-      with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-        teacher_fake = self.teacher_generator.unsigned_call(image_lr)
-        teacher_fake = tf.clip_by_value(teacher_fake, 0, 255)
-        logging.debug("Fetched Fake: Teacher")
-        student_fake = student.unsigned_call(image_lr)
-        student_fake = tf.clip_by_value(student_fake, 0, 255)
-        logging.debug("Fetched Fake: Student")
-        psnr = tf.image.psnr(student_fake, image_hr, max_val=255.0)
-        student_psnr(tf.reduce_mean(psnr))
-        psnr = tf.image.psnr(teacher_fake, image_hr, max_val=255.0)
-        teacher_psnr(tf.reduce_mean(psnr))
-        disc_loss = ra_discriminator(image_hr, student_fake)
-        # TODO (@captain-pool): Complete this
+    eta = 0.01
 
     def step_fn(image_lr, image_hr):
       """
@@ -357,10 +337,10 @@ class Trainer(object):
             "teacher_discriminator_loss",
             discriminator_metric.result(),
             step=step)
-        tf.summary.scalar("psnr", student_psnr.result(), step=step)
+        tf.summary.scalar("mean_psnr", student_psnr.result(), step=step)
       if self.summary_writer_2:
         with self.summary_writer_2.as_default():
-          tf.summary.scalar("psnr", teacher_psnr.result(), step=step)
+          tf.summary.scalar("mean_psnr", teacher_psnr.result(), step=step)
       if not step % self.train_args["print_step"]:
         logging.info(
             "[ADVERSARIAL] Step: %s\tStudent Loss: %s\t"
