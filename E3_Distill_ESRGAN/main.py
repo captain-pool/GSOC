@@ -75,7 +75,14 @@ def train_and_export(**kwargs):
     student_generator = (
         model.Registry
         .models[student_settings["student_network"]]())
-
+    hr_size = tf.convert_to_tensor([1] + student_settings['hr_size'])
+    lr_size = hr_size * tf.convert_to_tensor([1, 1/4, 1/4, 1])
+    logging.debug("Initializing Variables")
+    if not kwargs["export_only"]:
+      student_generator.unsigned_call(tf.random.normal(lr_size))
+    logging.debug("Scaling Variables to 10% of original")
+    for variable in student_generator.trainable_variables:
+      variable.assign(variable * 0.1)
     teacher_generator = teacher.generator(out_channel=3)
     teacher_discriminator = teacher.discriminator(
         batch_size=teacher_settings["batch_size"])
