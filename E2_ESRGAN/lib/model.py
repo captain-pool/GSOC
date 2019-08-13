@@ -36,9 +36,9 @@ class RRDBNet(tf.keras.Model):
     self.rrdb_block = partial(utils.RRDB, growth_channel)
     conv = partial(
         tf.keras.layers.Conv2D,
-        kernel_size=[3, 3],
         kernel_initializer="he_normal",
         bias_initializer="he_normal",
+        kernel_size=[3, 3],
         strides=[1, 1],
         padding="same",
         use_bias=use_bias)
@@ -47,20 +47,12 @@ class RRDBNet(tf.keras.Model):
         [self.rrdb_block() for _ in range(trunk_size)])
     self.conv_trunk = conv(filters=num_features)
     # Upsample
-    conv_transpose = partial(
-        tf.keras.layers.Conv2DTranspose,
-        kernel_initializer="he_normal",
-        bias_initializer="he_normal",
-        strides=2,
-        kernel_size=3,
-        padding="same")
-    self.upsample1 = conv_transpose(filters=num_features)
-    self.upsample2 = conv_transpose(filters=num_features)
-    self.conv_last_1 = conv(filters=num_features)
-    self.conv_last_2 = conv(filters=out_channel)
-
-    self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
-
+    self.upsample1 = conv(filters=256)
+    self.upsample2 = conv(filters=256)
+    self.conv_last_2 = conv(filters=out_channel, kernel_size=9)
+    self.prelu_0 = tf.keras.layers.PReLU()
+    self.prelu_1 = tf.keras.layers.PReLU()
+    self.prelu_2 = tf.keras.layers.PReLU()
   @tf.function(
       input_signature=[
           tf.TensorSpec(shape=[None, 180, 270, 3],
@@ -69,14 +61,15 @@ class RRDBNet(tf.keras.Model):
     return self.unsigned_call(inputs)
 
   def unsigned_call(self, input_):
-    feature = self.conv_first(input_)
+    feature = self.prelu_0(self.conv_first(input_))
     trunk = self.conv_trunk(self.rdb_trunk(feature))
     feature = trunk + feature
-    feature = self.lrelu(
-        self.upsample1(feature))
-    feature = self.lrelu(
-        self.upsample2(feature))
-    feature = self.lrelu(self.conv_last_1(feature))
+    feature = self.prelu_1(
+        tf.nn.depth_to_space(
+            self.upsample1(feature), 2))
+    feature = self.prelu_2(
+        tf.nn.depth_to_space(
+          self.upsample2(feature), 2))
     out = self.conv_last_2(feature)
     return out
 
@@ -104,11 +97,6 @@ class VGGArch(tf.keras.Model):
         kernel_initializer="he_normal",
         bias_initializer="he_normal",
         kernel_size=[3, 3], use_bias=use_bias, padding="same")
-    depthwise_conv = partial(
-        tf.keras.layers.DepthwiseConv2D,
-        depthwise_initializer="he_normal",
-        bias_initializer="he_normal",
-        kernel_size=[3, 3], use_bias=use_bias, padding="same")
     batch_norm = partial(tf.keras.layers.BatchNormalization)
     def no_batch_norm(x): return x
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
@@ -127,8 +115,8 @@ class VGGArch(tf.keras.Model):
     self._batch_norm["bn_0_1"] = no_batch_norm if batch_size < 256 else batch_norm()
     for i in range(1, 4):
       for j in range(1, 3):
-        self._conv_layers["conv_%d_%d" % (i, j)] = depthwise_conv(
-            depth_multiplier=(3 - j), strides=j)
+        self._conv_layers["conv_%d_%d" % (i, j)] = conv(
+            filters=num_features * (2**i), strides=j)
         self._batch_norm["bn_%d_%d" % (
             i, j)] = no_batch_norm if batch_size < 256 else batch_norm()
 
