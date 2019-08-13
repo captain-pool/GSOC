@@ -4,8 +4,8 @@ import argparse
 from absl import logging
 from lib import settings, train, model, utils
 from tensorflow.python.eager import profiler
-import tensorflow as tf
-
+import tensorflow.compat.v2 as tf
+tf.enable_v2_behavior()
 """ Enhanced Super Resolution GAN.
     Citation:
       @article{DBLP:journals/corr/abs-1809-00219,
@@ -62,8 +62,8 @@ def main(**kwargs):
     discriminator = model.VGGArch(batch_size=sett["batch_size"], num_features=16)
     # Initiate Variables
     logging.debug("Initiating Variables")
-    generator.unsigned_call(tf.random.normal(1, 180, 270, 3))
-    discriminator(tf.random.normal(1, 720, 1080, 3))
+    generator.unsigned_call(tf.random.normal([1, 128, 128, 3]))
+    discriminator.unsigned_call(tf.random.normal([1, 512, 512, 3]))
     logging.debug("Scaling Variables")
     for variable in generator.trainable_variables:
       variable.assign(0.1 * variable)

@@ -29,7 +29,7 @@ class RRDBNet(tf.keras.Model):
           self,
           out_channel,
           num_features=32,
-          trunk_size=23,
+          trunk_size=13,
           growth_channel=32,
           use_bias=True):
     super(RRDBNet, self).__init__()
@@ -120,7 +120,9 @@ class VGGArch(tf.keras.Model):
         self._batch_norm["bn_%d_%d" % (
             i, j)] = no_batch_norm if batch_size < 256 else batch_norm()
 
-  def call(self, input_):
+  def call(self, inputs):
+    return self.unsigned_call(inputs)
+  def unsigned_call(self, input_):
 
     features = self._lrelu(self._conv_layers["conv_0_0"](input_))
     features = self._lrelu(

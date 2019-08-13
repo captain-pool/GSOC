@@ -86,7 +86,6 @@ class Trainer(object):
     total_steps = phase_args["num_steps"]
     metric = tf.keras.metrics.Mean()
     psnr_metric = tf.keras.metrics.Mean()
-    tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     # Generator Optimizer
     G_optimizer = tf.optimizers.Adam(
         learning_rate=phase_args["adam"]["initial_lr"],
@@ -94,12 +93,11 @@ class Trainer(object):
         beta_2=phase_args["adam"]["beta_2"])
     checkpoint = tf.train.Checkpoint(
         G=generator,
-        G_optimizer=G_optimizer,
-        summary_step=tf.summary.experimental.get_step())
+        G_optimizer=G_optimizer)
 
     status = utils.load_checkpoint(checkpoint, "phase_1", self.model_dir)
     logging.debug("phase_1 status object: {}".format(status))
-    previous_loss = float("inf")
+    previous_loss = 0
     start_time = time.time()
     # Training starts
 
@@ -130,10 +128,6 @@ class Trainer(object):
 
     while True:
       image_lr, image_hr = next(self.dataset)
-      step = tf.summary.experimental.get_step()
-      if warmup_num_iter and step % warmup_num_iter:
-        return
-
       num_steps = train_step(image_lr, image_hr)
 
       if num_steps >= total_steps:
@@ -156,9 +150,8 @@ class Trainer(object):
                 decay_factor, G_optimizer.learning_rate))
       with self.summary_writer.as_default():
         tf.summary.scalar(
-            "warmup_loss", metric.result(), step=step)
-        tf.summary.scalar("mean_psnr", psnr_metric.result(), step=step)
-        step.assign_add(1)
+            "warmup_loss", metric.result(), step=G_optimizer.iterations)
+        tf.summary.scalar("mean_psnr", psnr_metric.result(), G_optimizer.iterations)
 
       if not num_steps % self.settings["print_step"]:
         logging.info(
@@ -169,9 +162,9 @@ class Trainer(object):
                 psnr_metric,
                 time.time() -
                 start_time))
-        if metric.result() < previous_loss:
+        if psnr_metric.result() > previous_loss:
           utils.save_checkpoint(checkpoint, "phase_1", self.model_dir)
-        previous_loss = metric.result()
+        previous_loss = psnr_metric.result()
         start_time = time.time()
 
   def train_gan(self, generator, discriminator):
@@ -188,7 +181,6 @@ class Trainer(object):
     hr_dimension = self.settings["dataset"]["hr_dimension"]
     eta = phase_args["eta"]
     total_steps = phase_args["num_steps"]
-    tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     optimizer = partial(
         tf.optimizers.Adam,
         learning_rate=phase_args["adam"]["initial_lr"],
@@ -209,9 +201,7 @@ class Trainer(object):
         G=generator,
         G_optimizer=G_optimizer,
         D=discriminator,
-        D_optimizer=D_optimizer,
-        summary_step=tf.summary.experimental.get_step())
-
+        D_optimizer=D_optimizer)
     if not tf.io.gfile.exists(
         os.path.join(
             self.model_dir,
@@ -219,13 +209,10 @@ class Trainer(object):
             "checkpoint")):
       hot_start = tf.train.Checkpoint(
           G=generator,
-          G_optimizer=G_optimizer,
-          summary_step=tf.summary.experimental.get_step())
+          G_optimizer=G_optimizer)
       status = utils.load_checkpoint(hot_start, "phase_1", self.model_dir)
       # consuming variable from checkpoint
-      tf.summary.experimental.get_step()
       G_optimizer.learning_rate.assign(phase_args["adam"]["initial_lr"])
-      tf.summary.experimental.set_step(tf.Variable(0, dtype=tf.int64))
     else:
       status = utils.load_checkpoint(checkpoint, "phase_2", self.model_dir)
 
@@ -245,7 +232,7 @@ class Trainer(object):
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         fake = generator.unsigned_call(image_lr)
         logging.debug("Fetched Generator Fake")
-        percep_loss = perceptual_loss(image_hr, fake)
+        percep_loss = tf.reduce_mean(perceptual_loss(image_hr, fake))
         logging.debug("Calculated Perceptual Loss")
         l1_loss = utils.pixel_loss(image_hr, fake)
         logging.debug("Calculated Pixel Loss")
@@ -295,7 +282,6 @@ class Trainer(object):
     last_psnr = 0
     while True:
       image_lr, image_hr = next(self.dataset)
-      step = tf.summary.experimental.get_step()
       num_step = train_step(image_lr, image_hr)
       if num_step >= total_steps:
         return
@@ -328,14 +314,13 @@ class Trainer(object):
       # Writing Summary
       with self.summary_writer.as_default():
         tf.summary.scalar(
-            "gen_loss", gen_metric.result(), step=step)
+            "gen_loss", gen_metric.result(), step=D_optimizer.iterations)
         tf.summary.scalar(
-            "disc_loss", disc_metric.result(), step=step)
-        tf.summary.scalar("mean_psnr", psnr_metric.result(), step=step)
-        step.assign_add(1)
+            "disc_loss", disc_metric.result(), step=D_optimizer.iterations)
+        tf.summary.scalar("mean_psnr", psnr_metric.result(), step=D_optimizer.iterations)
 
       # Logging and Checkpointing
-      if not step % self.settings["print_step"]:
+      if not num_step % self.settings["print_step"]:
         logging.info(
             "Step: {}\tGen Loss: {}\tDisc Loss: {}"
             "\tPSNR: {}\tTime Taken: {} sec".format(
