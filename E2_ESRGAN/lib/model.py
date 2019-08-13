@@ -111,7 +111,7 @@ class VGGArch(tf.keras.Model):
     self._conv_layers = OrderedDict()
     self._batch_norm = OrderedDict()
     self._conv_layers["conv_0_0"] = conv(filters=num_features, strides=1)
-    self._conv_layers["conv_0_1"] = depthwise_conv(strides=2)
+    self._conv_layers["conv_0_1"] = conv(filters=num_features, strides=2)
     self._batch_norm["bn_0_1"] = no_batch_norm if batch_size < 256 else batch_norm()
     for i in range(1, 4):
       for j in range(1, 3):
