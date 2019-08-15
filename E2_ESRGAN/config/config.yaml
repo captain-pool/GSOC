@@ -7,7 +7,7 @@ dataset:
   scale_method: "bicubic"
   hr_dimension: 512
 
-print_step: 100
+print_step: 1000
 
 # The following configuration is taken from ESRGAN Paper
 # Paper Available at: https://arxiv.org/abs/1809.00219
@@ -18,7 +18,7 @@ RDB:
 # warmup_num_iter: 1000 # Number of steps to train the PSNR model
 batch_size: 32
 train_psnr:
-  num_steps: 50000
+  num_steps: 10000
   adam:
     initial_lr: 0.0002 # Theory 0.0002
     decay:
@@ -28,9 +28,9 @@ train_psnr:
     beta_2: 0.999
 train_combined:
   perceptual_loss_type: "L1" # Can be either L1 or L2
-  num_steps: 1000000
-  lambda: 0.005
-  eta: 0.01
+  num_steps: 400000
+  lambda: !!float 5e-3
+  eta: !!float 1e-2
   adam:
     initial_lr: 0.0001
     beta_1: 0.9

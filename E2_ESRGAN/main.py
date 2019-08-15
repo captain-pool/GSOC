@@ -44,7 +44,7 @@ def main(**kwargs):
 
   for physical_device in tf.config.experimental.list_physical_devices("GPU"):
     tf.config.experimental.set_memory_growth(physical_device, True)
-
+  tf.random.set_seed(10)
   strategy = utils.SingleDeviceStrategy()
   scope = utils.assign_to_worker(kwargs["tpu"])
   sett = settings.Settings(kwargs["config"])
@@ -56,23 +56,20 @@ def main(**kwargs):
     tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
     strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
   with tf.device(scope), strategy.scope():
-    summary_writer = tf.summary.create_file_writer(kwargs["log_dir"])
+    summary_writer_1 = tf.summary.create_file_writer(
+        os.path.join(kwargs["log_dir"], "phase1"))
+    summary_writer_2 = tf.summary.create_file_writer(
+        os.path.join(kwargs["log_dir"], "phase2"))
     # profiler.start_profiler_server(6009)
     generator = model.RRDBNet(out_channel=3)
-    discriminator = model.VGGArch(batch_size=sett["batch_size"], num_features=16)
-    # Initiate Variables
-    logging.debug("Initiating Variables")
+    discriminator = model.VGGArch(batch_size=sett["batch_size"], num_features=64)
+    # Intiating Convolutions
+    logging.debug("Initiating Convolutions")
     generator.unsigned_call(tf.random.normal([1, 128, 128, 3]))
-    discriminator.unsigned_call(tf.random.normal([1, 512, 512, 3]))
-    logging.debug("Scaling Variables")
-    for variable in generator.trainable_variables:
-      variable.assign(0.1 * variable)
-    for variable in discriminator.trainable_variables:
-      variable.assign(0.1 * variable)
-
     if not kwargs["export_only"]:
       training = train.Trainer(
-          summary_writer=summary_writer,
+          summary_writer=summary_writer_1,
+          summary_writer_2=summary_writer_2,
           settings=sett,
           model_dir=kwargs["model_dir"],
           data_dir=kwargs["data_dir"],

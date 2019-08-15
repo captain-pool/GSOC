@@ -12,6 +12,7 @@ class Trainer(object):
   def __init__(
           self,
           summary_writer,
+          summary_writer_2,
           settings,
           model_dir="",
           data_dir=None,
@@ -27,6 +28,7 @@ class Trainer(object):
     self.settings = settings
     self.model_dir = model_dir
     self.summary_writer = summary_writer
+    self.summary_writer_2 = summary_writer_2
     self.strategy = strategy
     dataset_args = self.settings["dataset"]
     self.batch_size = self.settings["batch_size"]
@@ -102,6 +104,7 @@ class Trainer(object):
     # Training starts
 
     def _step_fn(image_lr, image_hr):
+      logging.debug("Starting Distributed Step")
       with tf.GradientTape() as tape:
         fake = generator.unsigned_call(image_lr)
         loss = utils.pixel_loss(image_hr, fake) * (1.0 / self.batch_size)
@@ -116,6 +119,7 @@ class Trainer(object):
       G_optimizer.apply_gradients(
           zip(gradient, gen_vars))
       mean_loss = metric(loss)
+      logging.debug("Ending Distributed Step")
       return tf.cast(G_optimizer.iterations, tf.float32)
 
     @tf.function
@@ -158,8 +162,8 @@ class Trainer(object):
             "[WARMUP] Step: {}\tGenerator Loss: {}"
             "\tPSNR: {}\tTime Taken: {} sec".format(
                 num_steps,
-                metric,
-                psnr_metric,
+                metric.result(),
+                psnr_metric.result(),
                 time.time() -
                 start_time))
         if psnr_metric.result() > previous_loss:
@@ -312,7 +316,7 @@ class Trainer(object):
               D_optimizer.learning_rate * decay_factor)
 
       # Writing Summary
-      with self.summary_writer.as_default():
+      with self.summary_writer_2.as_default():
         tf.summary.scalar(
             "gen_loss", gen_metric.result(), step=D_optimizer.iterations)
         tf.summary.scalar(
@@ -329,7 +333,7 @@ class Trainer(object):
                 disc_metric.result(),
                 psnr_metric.result(),
                 time.time() - start))
-        if psnr_metric.result() > last_psnr:
-          last_psnr = psnr_metric.result()
-          utils.save_checkpoint(checkpoint, "phase_2", self.model_dir)
+        # if psnr_metric.result() > last_psnr:
+        last_psnr = psnr_metric.result()
+        utils.save_checkpoint(checkpoint, "phase_2", self.model_dir)
         start = time.time()

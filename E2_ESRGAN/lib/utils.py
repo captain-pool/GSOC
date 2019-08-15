@@ -239,13 +239,12 @@ class RDB(tf.keras.layers.Layer):
 
   def __init__(self, out_features=32, bias=True):
     super(RDB, self).__init__()
-
     _create_conv2d = partial(
         tf.keras.layers.Conv2D,
         out_features,
         kernel_size=[3, 3],
         kernel_initializer="he_normal",
-        bias_initializer="he_normal",
+        bias_initializer="zeros",
         strides=[1, 1], padding="same", use_bias=bias)
     self._conv2d_layers = {
         "conv_1": _create_conv2d(),
@@ -255,7 +254,7 @@ class RDB(tf.keras.layers.Layer):
         "conv_5": _create_conv2d()}
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self._beta = settings.Settings()["RDB"].get("residual_scale_beta", 0.2)
-
+    self._first_call = True
   def call(self, input_):
     x1 = self._lrelu(self._conv2d_layers["conv_1"](input_))
     x2 = self._lrelu(self._conv2d_layers["conv_2"](
@@ -265,6 +264,12 @@ class RDB(tf.keras.layers.Layer):
     x4 = self._lrelu(self._conv2d_layers["conv_4"](
         tf.concat([input_, x1, x2, x3], -1)))
     x5 = self._conv2d_layers["conv_5"](tf.concat([input_, x1, x2, x3, x4], -1))
+    if self._first_call:
+      logging.debug("Initializing with MSRA")
+      for _, layer in self._conv2d_layers.items():
+        for variable in layer.trainable_variables:
+          variable.assign(0.1 * variable)
+      self._first_call = False
     return input_ + self._beta * x5
 
 
@@ -280,9 +285,6 @@ class RRDB(tf.keras.layers.Layer):
 
   def call(self, input_):
     out = self.RDB1(input_)
-    trunk = input_ + out
-    out = self.RDB2(trunk)
-    trunk = trunk + out
-    out = self.RDB3(trunk)
-    trunk = trunk + out
-    return input_ + self.beta * trunk
+    out = self.RDB2(out)
+    out = self.RDB3(out)
+    return input_ + self.beta * out
