@@ -19,8 +19,8 @@ train:
     - 13500
   balance_factor: 0.2 # alpha of Adversarial Training
 
-scale_factor: 2
-scale_value: 2
+scale_factor: 1
+scale_value: 4
 student_network: "rrdb_student"
 student_config:
   vgg_student:
