@@ -22,8 +22,11 @@ class ResidualDenseBlock(tf.keras.layers.Layer):
         depthwise_initializer="he_normal",
         bias_initializer="he_normal",
         kernel_size=[3, 3],
+        depthwise_initializer="he_normal",
+        bias_initializer="zeros",
         strides=[1, 1],
         padding="same")
+    self._first_call = True
     self._conv_layers = {
         "conv_%d" % index: convolution()
         for index in range(1, rdb_config["depth"])}
@@ -37,6 +40,12 @@ class ResidualDenseBlock(tf.keras.layers.Layer):
       raw_intermediate = self._conv_layers[layer_name](residual_junction)
       activated_intermediate = self._lrelu(raw_intermediate)
       intermediates.append(activated_intermediate)
+    if self._first_call:
+      logging.debug("Initializing Layers with 0.1 x MSRA")
+      for _, layer in self._conv_layers.items():
+        for weight in layer.trainable_variables:
+          weight.assign(0.1 * weight)
+      self._first_call = False
     return inputs + self._beta * raw_intermediate
 
 
@@ -58,7 +67,7 @@ class ResidualInResidualBlock(tf.keras.layers.Layer):
   def call(self, inputs):
     intermediate = inputs
     for layer_name in self._rdb_layers:
-      intermediate += self._rdb_layers[layer_name](intermediate)
+      intermediate = self._rdb_layers[layer_name](intermediate)
     return inputs + self._beta * intermediate
 
 
@@ -98,11 +107,13 @@ class RRDBStudent(abstract.Model):
         padding="same")
     self._rrdb_trunk = tf.keras.Sequential(
         [rrdb_block() for _ in range(rrdb_student_config["trunk_size"])])
-    self._first_conv = convolution(filters=32)
+    self._first_conv = convolution(filters=64)
     self._upsample_layers = {
         "upsample_%d" % index: conv_transpose(filters=growth_channels)
         for index in range(1, self._scale_factor)}
-    self._conv_last = conv_transpose(filters=3)
+    key = "upsample_%d" % self._scale_factor
+    self._upsample_layers[key] = conv_transpose(filters=3)
+    self._conv_last = depthwise_conv()
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
 
   @tf.function(
