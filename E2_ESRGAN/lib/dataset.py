@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from absl import logging
 from functools import partial
 import tensorflow as tf
@@ -40,13 +41,11 @@ def scale_down(method="bicubic", dimension=256, size=None, factor=4):
 
 
 def augment_image(
-        low_res_map_fn,
         brightness_delta=0.05,
         contrast_factor=[0.7, 1.3],
         saturation=[0.6, 1.6]):
   """ Helper function used for augmentation of images in the dataset.
       Args:
-        low_res_map_fn: Dataset mappable scaling function being used in the context.
         brightness_delta: maximum value for randomly assigning brightness of the image.
         contrast_factor: list / tuple of minimum and maximum value of factor to set random contrast.
                           None, if not to be used.
@@ -59,47 +58,62 @@ def augment_image(
     # Augmenting data (~ 80%)
     def augment_steps_fn(low_resolution, high_resolution):
       # Randomly rotating image (~50%)
-      high_resolution = tf.cond(
+      def rotate_fn(low_resolution, high_resolution):
+        times = tf.random.uniform(minval=1, maxval=4, dtype=tf.int32, shape=[])
+        return tf.image.rot90(low_resolution, high_resolution)
+      low_resolution, high_resolution = tf.cond(
           tf.less_equal(tf.random.uniform([]), 0.5),
-          lambda: tf.image.rot90(
-              high_resolution,
-              tf.random.uniform(
-                  minval=1,
-                  maxval=4,
-                  dtype=tf.int32,
-                  shape=[])),
-          lambda: high_resolution)
+          lambda: rotate_fn(low_resolution, high_resolution),
+          lambda: (low_resolution, high_resolution))
       # Randomly flipping image (~50%)
-      high_resolution = tf.cond(
+      def flip_fn(low_resolution, high_resolution):
+        return (tf.image.flip_left_right(low_resolution),
+                tf.image.flip_left_right(high_resolution))
+      low_resolution, high_resolution = tf.cond(
           tf.less_equal(tf.random.uniform([]), 0.5),
-          lambda: tf.image.random_flip_left_right(high_resolution),
-          lambda: high_resolution)
+          lambda: flip_fn(low_resolution, high_resolution),
+          lambda: (low_resolution, high_resolution))
 
       # Randomly setting brightness of image (~50%)
-      high_resolution = tf.cond(
+      def brightness_fn(low_resolution, high_resolution):
+        delta = tf.random.uniform(minval=0, maxval=brightness_delta, dtype=tf.float32, shape=[])
+        return (tf.image.adjust_brightness(low_resolution, delta=delta),
+                tf.image.adjust_brightness(high_resolution, delta=delta))
+      low_resolution, high_resolution = tf.cond(
           tf.less_equal(tf.random.uniform([]), 0.5),
-          lambda: tf.image.random_brightness(
-              high_resolution,
-              max_delta=brightness_delta),
-          lambda: high_resolution)
+          lambda: brightness_fn(low_resolution, high_resolution),
+          lambda: (low_resolution, high_resolution))
 
       # Randomly setting constrast (~50%)
+      def contrast_fn(low_resolution, high_resolution):
+        factor = tf.random.uniform(
+            minval=contrast_factor[0],
+            maxval=contrast_factor[1],
+            dtype=tf.float32, shape=[])
+        return (tf.image.adjust_contrast(low_resolution, factor),
+                tf.image.adjust_contrast(high_resolution, factor))
       if contrast_factor:
-        high_resolution = tf.cond(
+        low_resolution, high_resolution = tf.cond(
             tf.less_equal(tf.random.uniform([]), 0.5),
-            lambda: tf.image.random_contrast(
-                high_resolution, *contrast_factor),
-            lambda: high_resolution)
+            lambda: contrast_fn(low_resolution, high_resolution),
+            lambda: (low_resolution, high_resolution))
 
       # Randomly setting saturation(~50%)
+      def saturation_fn(low_resolution, high_resolution):
+        factor = tf.random.uniform(
+            minval=saturation[0],
+            maxval=saturation[1],
+            dtype=tf.float32,
+            shape=[])
+        return (tf.image.adjust_saturation(low_resolution, factor),
+               tf.image.adjust_saturation(high_resolution, factor))
       if saturation:
-        high_resolution = tf.cond(
+        low_resolution, high_resolution = tf.cond(
             tf.less_equal(tf.random.uniform([]), 0.5),
-            lambda: tf.image.random_saturation(
-                high_resolution, *saturation),
-            lambda: high_resolution)
+            lambda: saturation_fn(low_resolution, high_resolution),
+            lambda: (low_resolution, high_resolution))
 
-      return low_res_map_fn(high_resolution)
+      return low_resolution, high_resolution
 
     # Randomly returning unchanged data (~20%)
     return tf.cond(
@@ -135,6 +149,56 @@ def reform_dataset(dataset, types, size, num_elems=None):
   return tf.data.Dataset.from_generator(
       generator_fn, types, (tf.TensorShape([None, None, 3]), tf.TensorShape(None)))
 
+def load_div2k_dataset(
+    hr_directory,
+    lr_directory,
+    hr_size,
+    batch_size=None,
+    repeat=0,
+    shuffle=False,
+    augment=False,
+    cache="cache/",
+    buffer_size=3*32,
+    options=None):
+  """ Loads Div2K dataset """
+  scale = os.path.basename(lr_directory).lower()
+  lr_size=[hr_size[0] // int(scale[1:]), hr_size[1] // int(scale[1:])]
+  def _load_fn(hr_files):
+    for image in hr_files:
+      hr_image = tf.io.decode_image(tf.io.read_file(image))
+      lr_name = os.path.basename(image).split(".")
+      lr_name[-2] = lr_name[-2] + scale
+      lr_name = ".".join(lr_name)
+      lr_image = tf.io.decode_image(
+          tf.io.read_file(
+              os.path.join(lr_directory, lr_name)))
+      lr_h = np.random.randint(lr_image.shape[0] - lr_size[0] + 1)
+      lr_w = np.random.randint(lr_image.shape[1] - lr_size[1] + 1)
+      hr_h = lr_h * int(scale[1:])
+      hr_w = lr_w * int(scale[1:])
+      lr_image = tf.image.crop_to_bounding_box(lr_image, lr_h, lr_w, lr_size[0], lr_size[1])
+      hr_image = tf.image.crop_to_bounding_box(hr_image, hr_h, hr_w, hr_size[0], hr_size[1])
+      yield tf.cast(lr_image, tf.float32), tf.cast(hr_image, tf.float32)
+  
+  hr_files = tf.io.gfile.glob(os.path.join(hr_directory, "*.jpg"))
+  hr_files.extend(tf.io.gfile.glob(os.path.join(hr_directory, "*.png")))
+  dataset = tf.data.Dataset.from_generator(
+      partial(_load_fn, hr_files),
+      (tf.float32, tf.float32),
+      (tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])))
+  if shuffle:
+    dataset = dataset.shuffle(buffer_size, reshuffle_each_iteration=True)
+  if repeat:
+    dataset = dataset.repeat(repeat)
+  if augment:
+    dataset = dataset.map(
+        augment_image(saturation=None),
+        num_parallel_calls=tf.data.experimental.AUTOTUNE)
+  if batch_size:
+    dataset = dataset.batch(batch_size, drop_remainder=True)
+  if options:
+    dataset = dataset.with_options(options)
+  return dataset
 
 def load_dataset_directory(
         name,
@@ -171,7 +235,7 @@ def load_dataset_directory(
           buffer_size: size of shuffle buffer to use.
           num_elems: Number of elements to iterate over in the dataset.
       Returns:
-          A tf.data.Dataset having data as (low_resolution, high_resoltion)
+          A tf.data.Dataset having data as (low_resolution, high_resolution)
   """
   if not tf.io.gfile.exists(cache_dir):
     tf.io.gfile.mkdir(cache_dir)
@@ -188,7 +252,7 @@ def load_dataset_directory(
       size=low_res_map_fn.size,
       num_elems=num_elems)
   if options:
-    dataset.with_options(options)
+    dataset = dataset.with_options(options)
   dataset = dataset.map(
       low_res_map_fn,
       num_parallel_calls=tf.data.experimental.AUTOTUNE)
@@ -202,9 +266,7 @@ def load_dataset_directory(
 
   if augment:
     dataset = dataset.map(
-        augment_image(
-            partial(low_res_map_fn, no_random_crop=True),
-            saturation=None),
+        augment_image(saturation=None),
         num_parallel_calls=tf.data.experimental.AUTOTUNE)
   return dataset
 
@@ -235,7 +297,7 @@ def load_dataset(
           data_dir: Directory to save the downloaded dataset to.
           num_elems: Number of elements to iterate over in the dataset.
       Returns:
-          A tf.data.Dataset having data as (low_resolution, high_resoltion)
+          A tf.data.Dataset having data as (low_resolution, high_resolution)
 
   """
   if not tf.io.gfile.exists(cache_dir):
@@ -250,7 +312,7 @@ def load_dataset(
       size=low_res_map_fn.size,
       num_elems=num_elems)
   if options:
-    dataset.with_options(options)
+    dataset = dataset.with_options(options)
   dataset = dataset.map(
       low_res_map_fn,
       num_parallel_calls=tf.data.experimental.AUTOTUNE)
@@ -264,9 +326,7 @@ def load_dataset(
 
   if augment:
     dataset = dataset.map(
-        augment_image(
-            partial(low_res_map_fn, no_random_crop=True),
-            saturation=None),
+        augment_image(saturation=None),
         num_parallel_calls=tf.data.experimental.AUTOTUNE)
   return dataset
 
