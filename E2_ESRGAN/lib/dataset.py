@@ -173,13 +173,13 @@ def load_div2k_dataset(
       lr_image = tf.io.decode_image(
           tf.io.read_file(
               os.path.join(lr_directory, lr_name)))
-      lr_h = np.random.randint(lr_image.shape[0] - lr_size[0] + 1)
-      lr_w = np.random.randint(lr_image.shape[1] - lr_size[1] + 1)
-      hr_h = lr_h * int(scale[1:])
-      hr_w = lr_w * int(scale[1:])
-      lr_image = tf.image.crop_to_bounding_box(lr_image, lr_h, lr_w, lr_size[0], lr_size[1])
-      hr_image = tf.image.crop_to_bounding_box(hr_image, hr_h, hr_w, hr_size[0], hr_size[1])
-      yield tf.cast(lr_image, tf.float32), tf.cast(hr_image, tf.float32)
+      for lr_h in range(0, lr_image.shape[0] - lr_size[0] + 1, 40):
+        for lr_w in range(0, lr_image.shape[1] - lr_size[1] + 1, 40):
+          hr_h = lr_h * int(scale[1:])
+          hr_w = lr_w * int(scale[1:])
+          lr_image = tf.image.crop_to_bounding_box(lr_image, lr_h, lr_w, lr_size[0], lr_size[1])
+          hr_image = tf.image.crop_to_bounding_box(hr_image, hr_h, hr_w, hr_size[0], hr_size[1])
+          yield tf.cast(lr_image, tf.float32), tf.cast(hr_image, tf.float32)
   
   hr_files = tf.io.gfile.glob(os.path.join(hr_directory, "*.jpg"))
   hr_files.extend(tf.io.gfile.glob(os.path.join(hr_directory, "*.png")))
