@@ -14,15 +14,13 @@ def generate_tf_record(
   teacher_sett = settings.Settings(use_student_settings=False)
   student_sett = settings.Settings(use_student_settings=True)
   dataset_args = teacher_sett["dataset"]
-  if dataset_args["name"].lower().strip() is "div2k":
+  if dataset_args["name"].lower().strip() == "div2k":
     assert len(data_dir) == 2
     ds = dataset.load_div2k_dataset(
         data_dir[0],
         data_dir[1],
         student_sett["hr_size"],
-        repeat=10,
-        shuffle=True,
-        augment=True)
+        shuffle=True)
   elif raw_data:
     ds = dataset.load_dataset_directory(
         dataset_args["name"],

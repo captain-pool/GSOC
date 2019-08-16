@@ -60,7 +60,8 @@ def augment_image(
       # Randomly rotating image (~50%)
       def rotate_fn(low_resolution, high_resolution):
         times = tf.random.uniform(minval=1, maxval=4, dtype=tf.int32, shape=[])
-        return tf.image.rot90(low_resolution, high_resolution)
+        return (tf.image.rot90(low_resolution, times),
+                tf.image.rot90(high_resolution, times))
       low_resolution, high_resolution = tf.cond(
           tf.less_equal(tf.random.uniform([]), 0.5),
           lambda: rotate_fn(low_resolution, high_resolution),
