@@ -177,9 +177,9 @@ def load_div2k_dataset(
         for lr_w in range(0, lr_image.shape[1] - lr_size[1] + 1, 40):
           hr_h = lr_h * int(scale[1:])
           hr_w = lr_w * int(scale[1:])
-          lr_image = tf.image.crop_to_bounding_box(lr_image, lr_h, lr_w, lr_size[0], lr_size[1])
-          hr_image = tf.image.crop_to_bounding_box(hr_image, hr_h, hr_w, hr_size[0], hr_size[1])
-          yield tf.cast(lr_image, tf.float32), tf.cast(hr_image, tf.float32)
+          low_res = tf.image.crop_to_bounding_box(lr_image, lr_h, lr_w, lr_size[0], lr_size[1])
+          high_res = tf.image.crop_to_bounding_box(hr_image, hr_h, hr_w, hr_size[0], hr_size[1])
+          yield tf.cast(low_res, tf.float32), tf.cast(high_res, tf.float32)
   
   hr_files = tf.io.gfile.glob(os.path.join(hr_directory, "*.jpg"))
   hr_files.extend(tf.io.gfile.glob(os.path.join(hr_directory, "*.png")))
