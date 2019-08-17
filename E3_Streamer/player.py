@@ -68,7 +68,7 @@ class Player(object):
     logging.debug("Stacking")
     frames = tf.stack(frames)
     logging.debug("Resizing")
-    frames = tf.image.resize(frames, size=[720 // 4, 1080 // 4])
+    frames = tf.image.resize(frames, size=[720 // 4, 1080 // 4], method="bicubic")
     if self.saved_model:
       start = time.time()
       frames = self.saved_model.call(frames)
