@@ -29,30 +29,32 @@ class RRDBNet(tf.keras.Model):
           self,
           out_channel,
           num_features=32,
-          trunk_size=3,
+          trunk_size=11,
           growth_channel=32,
           use_bias=True):
     super(RRDBNet, self).__init__()
     self.rrdb_block = partial(utils.RRDB, growth_channel)
-    conv = partial(tf.keras.layers.Conv2D, kernel_size=[3, 3],
-                   strides=[1, 1],
-                   padding="same",
-                   use_bias=use_bias)
+    conv = partial(
+        tf.keras.layers.Conv2D,
+        kernel_size=[3, 3],
+        strides=[1, 1],
+        padding="same",
+        use_bias=use_bias)
+    conv_transpose = partial(
+        tf.keras.layers.Conv2DTranspose,
+        kernel_size=[3, 3],
+        strides=[2, 2],
+        padding="same",
+        use_bias=use_bias)
     self.conv_first = conv(filters=num_features)
     self.rdb_trunk = tf.keras.Sequential(
         [self.rrdb_block() for _ in range(trunk_size)])
     self.conv_trunk = conv(filters=num_features)
     # Upsample
-    conv_transpose = partial(
-        tf.keras.layers.Conv2DTranspose,
-        strides=2,
-        kernel_size=3,
-        padding="same")
-    self.upsample1 = conv_transpose(filters=num_features)
-    self.upsample2 = conv_transpose(filters=num_features)
-    self.conv_last_1 = conv(filters=num_features)
-    self.conv_last_2 = conv(filters=out_channel)
-
+    self.upsample1 = conv_transpose(num_features)
+    self.upsample2 = conv_transpose(num_features)
+    self.conv_last_1 = conv(num_features)
+    self.conv_last_2 = conv(out_channel)
     self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
 
   @tf.function(
@@ -63,13 +65,13 @@ class RRDBNet(tf.keras.Model):
     return self.unsigned_call(inputs)
 
   def unsigned_call(self, input_):
-    feature = self.conv_first(input_)
+    feature = self.lrelu(self.conv_first(input_))
     trunk = self.conv_trunk(self.rdb_trunk(feature))
     feature = trunk + feature
     feature = self.lrelu(
-        self.upsample1(feature))
+            self.upsample1(feature))
     feature = self.lrelu(
-        self.upsample2(feature))
+          self.upsample2(feature))
     feature = self.lrelu(self.conv_last_1(feature))
     out = self.conv_last_2(feature)
     return out
@@ -90,7 +92,7 @@ class VGGArch(tf.keras.Model):
           batch_size=8,
           output_shape=1,
           num_features=64,
-          use_bias=True):
+          use_bias=False):
 
     super(VGGArch, self).__init__()
     conv = partial(
@@ -99,21 +101,22 @@ class VGGArch(tf.keras.Model):
     batch_norm = partial(tf.keras.layers.BatchNormalization)
     def no_batch_norm(x): return x
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
-    self._dense_1 = tf.keras.layers.Dense(1024)
+    self._dense_1 = tf.keras.layers.Dense(100)
     self._dense_2 = tf.keras.layers.Dense(output_shape)
     self._conv_layers = OrderedDict()
     self._batch_norm = OrderedDict()
     self._conv_layers["conv_0_0"] = conv(filters=num_features, strides=1)
     self._conv_layers["conv_0_1"] = conv(filters=num_features, strides=2)
-    self._batch_norm["bn_0_1"] = no_batch_norm if batch_size < 256 else batch_norm()
+    self._batch_norm["bn_0_1"] = batch_norm()
     for i in range(1, 4):
       for j in range(1, 3):
         self._conv_layers["conv_%d_%d" % (i, j)] = conv(
-            filters=2**i * num_features, strides=j)
-        self._batch_norm["bn_%d_%d" % (
-            i, j)] = no_batch_norm if batch_size < 256 else batch_norm()
+            filters=num_features * (2**i), strides=j)
+        self._batch_norm["bn_%d_%d" % (i, j)] = batch_norm()
 
-  def call(self, input_):
+  def call(self, inputs):
+    return self.unsigned_call(inputs)
+  def unsigned_call(self, input_):
 
     features = self._lrelu(self._conv_layers["conv_0_0"](input_))
     features = self._lrelu(

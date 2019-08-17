@@ -3,11 +3,11 @@ checkpoint_path:
   phase_2: "checkpoints/phase_2"
 
 dataset: 
-  name: "flickr100k"
+  name: "div2k"
   scale_method: "bicubic"
   hr_dimension: 512
 
-print_step: 100
+print_step: 1000
 
 # The following configuration is taken from ESRGAN Paper
 # Paper Available at: https://arxiv.org/abs/1809.00219
@@ -16,29 +16,31 @@ RDB:
   residual_scale_beta: 0.2
 #Training
 # warmup_num_iter: 1000 # Number of steps to train the PSNR model
-batch_size: 128
+batch_size: 32
 train_psnr:
-  num_steps: 20000
+  num_steps: 600000
   adam:
-    initial_lr: 0.002 # Theory 0.0002
+    initial_lr: 0.0002 # Theory 0.0002
     decay:
       factor: 0.5
-      step: 2000 # Theory: 2 x 10^5 Steps
+      step: 200000 # Theory: 2 x 10^5 Steps
     beta_1: 0.9
     beta_2: 0.999
 train_combined:
   perceptual_loss_type: "L1" # Can be either L1 or L2
-  num_steps: 50000
-  lambda: 0.005
-  eta: 0.01
+  num_steps: 400000
+  lambda: !!float 5e-3
+  eta: !!float 1e-2
   adam:
-    initial_lr: 0.0001
+    initial_lr: !!float 5e-5
     beta_1: 0.9
     beta_2: 0.999
     decay:
       factor: 0.5
       step:
-        - 5000
-        - 10000
-        - 20000
+        - 9000
         - 30000
+        - 50000
+        - 100000
+        - 200000
+        - 300000

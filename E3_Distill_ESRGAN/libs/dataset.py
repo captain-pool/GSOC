@@ -6,7 +6,6 @@ import tensorflow as tf
 
 
 def generate_tf_record(
-        dataset_name,
         data_dir,
         raw_data=False,
         tfrecord_path="serialized_dataset",
@@ -15,7 +14,14 @@ def generate_tf_record(
   teacher_sett = settings.Settings(use_student_settings=False)
   student_sett = settings.Settings(use_student_settings=True)
   dataset_args = teacher_sett["dataset"]
-  if raw_data:
+  if dataset_args["name"].lower().strip() == "div2k":
+    assert len(data_dir) == 2
+    ds = dataset.load_div2k_dataset(
+        data_dir[0],
+        data_dir[1],
+        student_sett["hr_size"],
+        shuffle=True)
+  elif raw_data:
     ds = dataset.load_dataset_directory(
         dataset_args["name"],
         data_dir,
@@ -60,7 +66,7 @@ def load_dataset(tfrecord_path, lr_size, hr_size):
   return ds
 
 
-def to_tfrecord(ds, tfrecord_path, NUM_SHARDS=8):
+def to_tfrecord(ds, tfrecord_path, num_shards=8):
   def _bytes_feature(value):
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
@@ -91,7 +97,7 @@ def to_tfrecord(ds, tfrecord_path, NUM_SHARDS=8):
   ds = ds.map(map_serialize_to_string)
   ds = ds.enumerate()
   ds = ds.apply(tf.data.experimental.group_by_window(
-      lambda i, _: i % NUM_SHARDS,
+      lambda i, _: i % num_shards,
       write_to_tfrecord,
       tf.int64.max))
   for data in ds:

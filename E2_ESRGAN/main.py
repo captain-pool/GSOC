@@ -4,8 +4,8 @@ import argparse
 from absl import logging
 from lib import settings, train, model, utils
 from tensorflow.python.eager import profiler
-import tensorflow as tf
-
+import tensorflow.compat.v2 as tf
+tf.enable_v2_behavior()
 """ Enhanced Super Resolution GAN.
     Citation:
       @article{DBLP:journals/corr/abs-1809-00219,
@@ -44,11 +44,11 @@ def main(**kwargs):
 
   for physical_device in tf.config.experimental.list_physical_devices("GPU"):
     tf.config.experimental.set_memory_growth(physical_device, True)
-
   strategy = utils.SingleDeviceStrategy()
   scope = utils.assign_to_worker(kwargs["tpu"])
   sett = settings.Settings(kwargs["config"])
   Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
+  tf.random.set_seed(10)
   if kwargs["tpu"]:
     cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
         kwargs["tpu"])
@@ -56,13 +56,20 @@ def main(**kwargs):
     tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
     strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
   with tf.device(scope), strategy.scope():
-    summary_writer = tf.summary.create_file_writer(kwargs["log_dir"])
+    summary_writer_1 = tf.summary.create_file_writer(
+        os.path.join(kwargs["log_dir"], "phase1"))
+    summary_writer_2 = tf.summary.create_file_writer(
+        os.path.join(kwargs["log_dir"], "phase2"))
     # profiler.start_profiler_server(6009)
     generator = model.RRDBNet(out_channel=3)
-    discriminator = model.VGGArch(batch_size=sett["batch_size"])
+    discriminator = model.VGGArch(batch_size=sett["batch_size"], num_features=64)
+    # Intiating Convolutions
+    logging.debug("Initiating Convolutions")
+    generator.unsigned_call(tf.random.normal([1, 128, 128, 3]))
     if not kwargs["export_only"]:
       training = train.Trainer(
-          summary_writer=summary_writer,
+          summary_writer=summary_writer_1,
+          summary_writer_2=summary_writer_2,
           settings=sett,
           model_dir=kwargs["model_dir"],
           data_dir=kwargs["data_dir"],

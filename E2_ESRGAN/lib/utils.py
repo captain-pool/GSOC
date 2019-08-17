@@ -22,6 +22,7 @@ def save_checkpoint(checkpoint, training_phase, basepath=""):
     dir_ = os.path.join(basepath, dir_)
   dir_ = os.path.join(dir_, os.path.basename(dir_))
   checkpoint.save(file_prefix=dir_)
+  logging.debug("Prefix: %s. checkpoint saved successfully!" % dir_)
 
 
 def load_checkpoint(checkpoint, training_phase, basepath=""):
@@ -102,7 +103,10 @@ def interpolate_generator(
   return gan_generator
 
 # Losses
-
+def preprocess_input(image):
+  image = image[...,::-1]
+  mean = -tf.constant([103.939, 116.779, 123.68])
+  return tf.nn.bias_add(image, mean)
 
 def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
   """ Perceptual Loss using VGG19
@@ -111,25 +115,21 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
         input_shape: Shape of input image.
         loss_type: Loss type for features. (L1 / L2)
   """
-  vgg_model = tf.keras.applications.VGG19(
+  vgg_model = tf.keras.applications.vgg19.VGG19(
       input_shape=input_shape, weights=weights, include_top=False)
   for layer in vgg_model.layers:
     layer.trainable = False
+  # Removing Activation Function
+  vgg_model.get_layer("block5_conv4").activation = lambda x: x
   phi = tf.keras.Model(
       inputs=[vgg_model.input],
       outputs=[
           vgg_model.get_layer("block5_conv4").output])
 
   def loss(y_true, y_pred):
-    y_true = tf.cast(y_true, tf.float32)
-    y_pred = tf.cast(y_pred, tf.float32)
     if loss_type.lower() == "l1":
-      return tf.reduce_mean(
-          tf.reduce_mean(
-              tf.abs(
-                  phi(y_true) -
-                  phi(y_pred)),
-              axis=0))
+      return tf.compat.v1.losses.absolute_difference(phi(y_true), phi(y_pred))
+
     if loss_type.lower() == "l2":
       return tf.reduce_mean(
           tf.reduce_mean(
@@ -235,11 +235,12 @@ class RDB(tf.keras.layers.Layer):
 
   def __init__(self, out_features=32, bias=True):
     super(RDB, self).__init__()
-
     _create_conv2d = partial(
         tf.keras.layers.Conv2D,
         out_features,
         kernel_size=[3, 3],
+        kernel_initializer="he_normal",
+        bias_initializer="zeros",
         strides=[1, 1], padding="same", use_bias=bias)
     self._conv2d_layers = {
         "conv_1": _create_conv2d(),
@@ -249,7 +250,7 @@ class RDB(tf.keras.layers.Layer):
         "conv_5": _create_conv2d()}
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self._beta = settings.Settings()["RDB"].get("residual_scale_beta", 0.2)
-
+    self._first_call = True
   def call(self, input_):
     x1 = self._lrelu(self._conv2d_layers["conv_1"](input_))
     x2 = self._lrelu(self._conv2d_layers["conv_2"](
@@ -259,6 +260,12 @@ class RDB(tf.keras.layers.Layer):
     x4 = self._lrelu(self._conv2d_layers["conv_4"](
         tf.concat([input_, x1, x2, x3], -1)))
     x5 = self._conv2d_layers["conv_5"](tf.concat([input_, x1, x2, x3, x4], -1))
+    if self._first_call:
+      logging.debug("Initializing with MSRA")
+      for _, layer in self._conv2d_layers.items():
+        for variable in layer.trainable_variables:
+          variable.assign(0.1 * variable)
+      self._first_call = False
     return input_ + self._beta * x5
 
 
@@ -274,9 +281,6 @@ class RRDB(tf.keras.layers.Layer):
 
   def call(self, input_):
     out = self.RDB1(input_)
-    trunk = input_ + out
-    out = self.RDB2(trunk)
-    trunk = trunk + out
-    out = self.RDB3(trunk)
-    trunk = trunk + out
-    return input_ + self.beta * trunk
+    out = self.RDB2(out)
+    out = self.RDB3(out)
+    return input_ + self.beta * out
