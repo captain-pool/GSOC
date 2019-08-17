@@ -5,6 +5,7 @@ import threading
 import time
 
 from absl import logging
+import argparse
 import queue
 import numpy as np
 import datapacket_pb2
@@ -135,6 +136,15 @@ class Client(object):
 
 
 if __name__ == "__main__":
+  parser = argparse.ArgumentParser()
+  parser.add_argument(
+      "--server",
+      default="127.0.0.1",
+      help="Address of stream server.")
+  parser.add_argument(
+      "--port",
+      default=8001,
+      help="Port of the server to connect to.")
   logging.set_verbosity(logging.DEBUG)
   client = Client("127.0.0.1", 8001)
   client.start()
