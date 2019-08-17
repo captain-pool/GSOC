@@ -56,6 +56,12 @@ class Player(object):
         frames_per_buffer=1024)
 
   def tflite_super_resolve(self, frame):
+    """
+      Super Resolve bicubically downsampled image frames
+      using the TFLite of the model.
+      Args:
+        frame: Image frame to scale up.
+    """
     frame = tf.expand_dims(tf.convert_to_tensor(frame), 0)
     frame = tf.image.resize(frame, size=[720 // 4, 1080 // 4])
     self.interpreter.set_tensor(self.input_details[0]['index'], frame)
@@ -65,6 +71,11 @@ class Player(object):
     return frame.numpy()
 
   def saved_model_super_resolve(self, frames):
+    """
+      Super Resolve using exported SavedModel.
+      Args:
+        frames: Batch of Frames to Scale Up.
+    """
     logging.debug("Stacking")
     frames = tf.stack(frames)
     logging.debug("Resizing")
@@ -79,6 +90,10 @@ class Player(object):
     return frames.numpy()
 
   def video_second(self):
+    """
+      Fetch Video Frames for each second
+      and super resolve them accordingly.
+    """
     frames = []
     logging.debug("Fetching Frames")
     start = time.time()
@@ -97,12 +112,19 @@ class Player(object):
     return frames
 
   def fetch_video(self):
+    """
+      Fetches audio and video frames from the file.
+      And put them in player cache.
+    """
     audio = next(self.audio_iterator)
     video = self.video_second()
     self.audio_queue.put(audio)
     self.video_queue.put(video)
 
   def write_audio_stream(self):
+    """
+      Write Audio Frames to default audio device.
+    """
     try:
       while self.audio_queue.qsize() < 8:
         continue
@@ -113,6 +135,9 @@ class Player(object):
       raise
 
   def write_video_stream(self):
+    """
+      Write Video frames to the player display.
+    """
     try:
       while self.video_queue.qsize() < 8:
         continue
@@ -128,6 +153,9 @@ class Player(object):
       raise
 
   def run(self):
+  """
+    Start the player threads and the frame streaming simulator.
+  """
     with self.lock:
       if not self.running:
         self.running = True
