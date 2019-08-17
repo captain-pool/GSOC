@@ -44,11 +44,11 @@ def main(**kwargs):
 
   for physical_device in tf.config.experimental.list_physical_devices("GPU"):
     tf.config.experimental.set_memory_growth(physical_device, True)
-  tf.random.set_seed(10)
   strategy = utils.SingleDeviceStrategy()
   scope = utils.assign_to_worker(kwargs["tpu"])
   sett = settings.Settings(kwargs["config"])
   Stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
+  tf.random.set_seed(10)
   if kwargs["tpu"]:
     cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
         kwargs["tpu"])

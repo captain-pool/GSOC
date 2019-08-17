@@ -239,6 +239,9 @@ class Trainer(object):
       with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
         fake = generator.unsigned_call(image_lr)
         logging.debug("Fetched Generator Fake")
+        fake = utils.preprocess_input(fake)
+        image_lr = utils.preprocess_input(image_lr)
+        image_hr = utils.preprocess_input(image_hr)
         percep_loss = tf.reduce_mean(perceptual_loss(image_hr, fake))
         logging.debug("Calculated Perceptual Loss")
         l1_loss = utils.pixel_loss(image_hr, fake)
@@ -250,10 +253,10 @@ class Trainer(object):
         logging.debug("Calculated RA Loss Discriminator")
         gen_loss = percep_loss + lambda_ * loss_RaG + eta * l1_loss
         logging.debug("Calculated Generator Loss")
-        gen_loss = gen_loss * (1.0 / self.batch_size)
-        disc_loss = disc_loss * (1.0 / self.batch_size)
         disc_metric(disc_loss)
         gen_metric(gen_loss)
+        gen_loss = gen_loss * (1.0 / self.batch_size)
+        disc_loss = disc_loss * (1.0 / self.batch_size)
         psnr_metric(
             tf.reduce_mean(
                 tf.image.psnr(
@@ -263,15 +266,15 @@ class Trainer(object):
       disc_grad = disc_tape.gradient(
           disc_loss, discriminator.trainable_variables)
       logging.debug("Calculated gradient for Discriminator")
+      D_optimizer.apply_gradients(
+          zip(disc_grad, discriminator.trainable_variables))
+      logging.debug("Applied gradients to Discriminator")
       gen_grad = gen_tape.gradient(
           gen_loss, generator.trainable_variables)
       logging.debug("Calculated gradient for Generator")
       G_optimizer.apply_gradients(
           zip(gen_grad, generator.trainable_variables))
       logging.debug("Applied gradients to Generator")
-      D_optimizer.apply_gradients(
-          zip(disc_grad, discriminator.trainable_variables))
-      logging.debug("Applied gradients to Discriminator")
 
       return tf.cast(D_optimizer.iterations, tf.float32)
 

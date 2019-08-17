@@ -103,6 +103,10 @@ def interpolate_generator(
   return gan_generator
 
 # Losses
+def preprocess_input(image):
+  image = image[...,::-1]
+  mean = -tf.constant([103.939, 116.779, 123.68])
+  return tf.nn.bias_add(image, mean)
 
 def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
   """ Perceptual Loss using VGG19
@@ -111,11 +115,6 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
         input_shape: Shape of input image.
         loss_type: Loss type for features. (L1 / L2)
   """
-  def preprocess_input(image):
-    image = image[...,::-1]
-    mean = -tf.constant([103.939, 116.779, 123.68])
-    return tf.nn.bias_add(image, mean)
-
   vgg_model = tf.keras.applications.vgg19.VGG19(
       input_shape=input_shape, weights=weights, include_top=False)
   for layer in vgg_model.layers:
@@ -128,12 +127,9 @@ def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
           vgg_model.get_layer("block5_conv4").output])
 
   def loss(y_true, y_pred):
-    y_true = preprocess_input(y_true)
-    y_pred = preprocess_input(y_pred)
     if loss_type.lower() == "l1":
-      abs_diff = tf.abs(phi(y_true) - phi(y_pred))
-      mean = tf.reduce_mean(abs_diff)
-      return mean
+      return tf.compat.v1.losses.absolute_difference(phi(y_true), phi(y_pred))
+
     if loss_type.lower() == "l2":
       return tf.reduce_mean(
           tf.reduce_mean(
