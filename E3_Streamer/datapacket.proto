@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+// Protocol Buffer for Video
+// Packets
+message Metadata{
+  required int32 duration = 1;
+  required int32 video_fps = 2;
+  required int32 audio_fps = 3;
+  repeated int32 dimension = 4;
+}
+
+message FramePacket{
+  repeated bytes video_frames = 3;
+  optional bytes audio_chunk = 4;
+}
