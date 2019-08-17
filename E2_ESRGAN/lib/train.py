@@ -31,7 +31,7 @@ class Trainer(object):
     self.summary_writer_2 = summary_writer_2
     self.strategy = strategy
     dataset_args = self.settings["dataset"]
-    self.augment_dataset = tf.function(dataset.augment_image(saturation=None))
+    augment_dataset = dataset.augment_image(saturation=None)
     self.batch_size = self.settings["batch_size"]
     hr_size = tf.convert_to_tensor(
         [dataset_args["hr_dimension"],
@@ -40,10 +40,13 @@ class Trainer(object):
         tf.convert_to_tensor([1 / 4, 1 / 4, 1], tf.float32)
     lr_size = tf.cast(lr_size, tf.int32)
     if isinstance(strategy, tf.distribute.Strategy):
-      self.dataset = dataset.load_tfrecord_dataset(
+      self.dataset = (dataset.load_tfrecord_dataset(
           tfrecord_path=data_dir,
           lr_size=lr_size,
-          hr_size=hr_size).repeat().batch(self.batch_size, drop_remainder=True)
+          hr_size=hr_size)
+          .repeat()
+          .map(augment_dataset)
+          .batch(self.batch_size, drop_remainder=True))
       self.dataset = iter(
           strategy.experimental_distribute_dataset(
               self.dataset))
@@ -131,7 +134,7 @@ class Trainer(object):
       return mean_metric
 
     while True:
-      image_lr, image_hr = self.augment_dataset(*next(self.dataset))
+      image_lr, image_hr = next(self.dataset)
       num_steps = train_step(image_lr, image_hr)
 
       if num_steps >= total_steps:
@@ -285,7 +288,7 @@ class Trainer(object):
     start = time.time()
     last_psnr = 0
     while True:
-      image_lr, image_hr = self.augment_dataset(*next(self.dataset))
+      image_lr, image_hr = next(self.dataset)
       num_step = train_step(image_lr, image_hr)
       if num_step >= total_steps:
         return
