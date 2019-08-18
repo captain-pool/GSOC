@@ -14,3 +14,4 @@ Repository for Google Summer of Code 2019
 |E2|Train ESRGAN Model from Scratch and Export as TF Hub Module|[Here](E2_ESRGAN)|:heavy_check_mark:|
 |E2|Adding Support to SavedModel 2.0 in `saved_model_cli`|[Here](https://github.com/tensorflow/tensorflow/pull/30752)|:heavy_check_mark:|
 |E3|Knowledge Distillation of ESRGAN|[Here](E3_Distill_ESRGAN)|:construction:|
+|E3| Proof of Concept Video Player for Real Time Video Frame Super Resolution|[Here](E3_Streamer)|:heavy_check_mark:|
