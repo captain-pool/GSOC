@@ -3,6 +3,8 @@ import argparse
 import tensorflow as tf
 import tensorflow_hub as hub
 import os
+import multiprocessing
+from functools import partial
 import time
 import pyaudio as pya
 import threading
@@ -12,6 +14,7 @@ from moviepy import editor
 import pygame
 pygame.init()
 os.environ["TFHUB_DOWNLOAD_PROGRESS"] = "True"
+BUFFER_SIZE = 8
 
 
 class Player(object):
@@ -62,32 +65,25 @@ class Player(object):
       Args:
         frame: Image frame to scale up.
     """
-    frame = tf.expand_dims(tf.convert_to_tensor(frame), 0)
-    frame = tf.image.resize(frame, size=[720 // 4, 1080 // 4])
     self.interpreter.set_tensor(self.input_details[0]['index'], frame)
     self.interpreter.invoke()
     frame = self.interpreter.get_tensor(self.output_details[0]['index'])
-    frame = tf.squeeze(tf.cast(tf.clip_by_value(frame, 0, 255), tf.uint8))
+    frame = tf.squeeze(tf.cast(tf.clip_by_value(frame, 0, 255), "uint8"))
     return frame.numpy()
 
-  def saved_model_super_resolve(self, frames):
+  def saved_model_super_resolve(self, frame):
     """
       Super Resolve using exported SavedModel.
       Args:
         frames: Batch of Frames to Scale Up.
     """
-    logging.debug("Stacking")
-    frames = tf.stack(frames)
-    logging.debug("Resizing")
-    frames = tf.image.resize(frames, size=[720 // 4, 1080 // 4], method="bicubic")
     if self.saved_model:
       start = time.time()
-      frames = self.saved_model.call(frames)
+      frame = self.saved_model.call(frame)
       logging.debug("Super Resolving Time: %f" % (time.time() - start))
-    logging.debug("Casting and Clipping")
-    frames = tf.cast(tf.clip_by_value(frames, 0, 255), tf.uint8)
+    #frame = tf.squeeze(tf.cast(tf.clip_by_value(frame, 0, 255), tf.uint8))
     logging.debug("Returning Modified Frames")
-    return frames.numpy()
+    return np.squeeze(np.clip(frame.numpy(), 0, 255).astype("uint8"))
 
   def video_second(self):
     """
@@ -101,14 +97,23 @@ class Player(object):
     for _ in range(int(self.video.fps)):
       logging.debug("Fetching Video Frame. %f" % (time.time() - loop_time))
       loop_time = time.time()
-      if self.interpreter and not self.saved_model:
-        frames.append(self.tflite_super_resolve(next(self.video_iterator)))
-      if not self.interpreter:
-        frames.append(tf.convert_to_tensor(next(self.video_iterator)))
+      frame = next(self.video_iterator)
+      frame = tf.image.resize(
+          frame,
+          size=[
+              720 // 4,
+              1080 // 4],
+          method="bicubic")
+      frames.append(tf.expand_dims(frame, 0))
     logging.debug("Frame Fetching Time: %f" % (time.time() - start))
-    if not self.interpreter:
-      frames = self.saved_model_super_resolve(frames)
-    logging.debug("Fetched Frames")
+    if self.interpreter and not self.saved_model:
+      resolution_fn = self.tflite_super_resolve
+    else:
+      resolution_fn = self.saved_model_super_resolve
+    start = time.time()
+    with multiprocessing.pool.ThreadPool(30) as pool:
+      frames = pool.map(resolution_fn, frames)
+    logging.debug("Fetched Frames. Time: %f" % (time.time() - start))
     return frames
 
   def fetch_video(self):
@@ -126,7 +131,7 @@ class Player(object):
       Write Audio Frames to default audio device.
     """
     try:
-      while self.audio_queue.qsize() < 8:
+      while self.audio_queue.qsize() < BUFFER_SIZE:
         continue
       while self.running:
         audio = self.audio_queue.get(timeout=10)
@@ -139,9 +144,10 @@ class Player(object):
       Write Video frames to the player display.
     """
     try:
-      while self.video_queue.qsize() < 8:
+      while self.video_queue.qsize() < BUFFER_SIZE:
         continue
       while self.running:
+        logging.info("Displaying Frame")
         for video_frame in self.video_queue.get(timeout=10):
           video_frame = pygame.surfarray.make_surface(
               np.rot90(np.fliplr(video_frame)))
@@ -153,9 +159,9 @@ class Player(object):
       raise
 
   def run(self):
-  """
-    Start the player threads and the frame streaming simulator.
-  """
+    """
+      Start the player threads and the frame streaming simulator.
+    """
     with self.lock:
       if not self.running:
         self.running = True
@@ -192,7 +198,7 @@ if __name__ == "__main__":
       default="",
       help="Path to Saved Model File")
   FLAGS, unknown_args = parser.parse_known_args()
-  log_levels = [logging.WARNING, logging.INFO, logging.DEBUG]
+  log_levels = [logging.FATAL, logging.WARNING, logging.INFO, logging.DEBUG]
   current_log_level = log_levels[min(len(log_levels) - 1, FLAGS.verbose)]
   logging.set_verbosity(current_log_level)
   player = Player(
