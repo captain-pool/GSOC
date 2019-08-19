@@ -20,13 +20,14 @@ train:
     initial_lr: !!float 5e-5
     num_steps: 400000
     print_step: 1000
+    checkpoint_step: 2000
     decay_rate: 0.5
     decay_steps:
       - 20000
       - 50000
       - 90000
-  lambda: !!float 5e-3
-  eta: !!float 1e-2
+    lambda: !!float 5e-3
+    eta: !!float 1e-2
 
 scale_factor: 1
 scale_value: 4
