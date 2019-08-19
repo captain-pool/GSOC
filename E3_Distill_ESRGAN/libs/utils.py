@@ -9,7 +9,7 @@ from lib.utils import assign_to_worker
 from lib.utils import PerceptualLoss
 from lib.utils import RelativisticAverageLoss
 from lib.utils import SingleDeviceStrategy
-
+from lib.utils import preprocess_input
 
 def checkpoint_exists(names, basepath="", use_student_settings=False):
   sett = settings.Settings(use_student_settings=use_student_settings)
