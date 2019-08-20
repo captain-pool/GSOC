@@ -106,14 +106,13 @@ class Trainer(object):
       """
       with tf.GradientTape() as tape:
         teacher_fake = self.teacher_generator.unsigned_call(image_lr)
-        teacher_fake = tf.clip_by_value(teacher_fake, 0, 255)
         student_fake = student.unsigned_call(image_lr)
         student_fake = tf.clip_by_value(student_fake, 0, 255)
-        psnr = tf.image.psnr(student_fake, image_hr, max_val=255.0)
-        student_psnr(tf.reduce_mean(psnr))
-        psnr = tf.image.psnr(teacher_fake, image_hr, max_val=255.0)
-        teacher_psnr(tf.reduce_mean(psnr))
-        loss = loss_fn(teacher_fake, student_fake)
+        teacher_fake = tf.clip_by_value(teacher_fake, 0, 255)
+        image_hr = tf.clip_by_value(image_hr, 0, 255)
+        student_psnr(tf.reduce_mean(tf.image.psnr(student_fake, image_hr, max_val=256.0)))
+        teacher_psnr(tf.reduce_mean(tf.image.psnr(teacher_fake, image_hr, max_val=256.0)))
+        loss = utils.pixelwise_mse(teacher_fake, student_fake)
         loss = tf.reduce_mean(loss) * (1.0 / self.batch_size)
         metric_fn(loss)
       student_vars = list(set(student.trainable_variables))
@@ -144,7 +143,7 @@ class Trainer(object):
       if step >= total_steps:
         return
       for _step in decay_steps.copy():
-        if _step >= step:
+        if step >= _step:
           decay_steps.pop(0)
           logging.debug("Reducing Learning Rate by: %f" % decay_rate)
           optimizer.learning_rate.assign(optimizer.learning_rate * decay_rate)
@@ -249,6 +248,7 @@ class Trainer(object):
         student_fake = student.unsigned_call(image_lr)
         logging.debug("Fetched Fake: Student")
         student_fake = tf.clip_by_value(student_fake, 0, 255)
+        image_hr = tf.clip_by_value(image_hr, 0, 255)
         psnr = tf.image.psnr(student_fake, image_hr, max_val=255.0)
         student_psnr(tf.reduce_mean(psnr))
         psnr = tf.image.psnr(teacher_fake, image_hr, max_val=255.0)

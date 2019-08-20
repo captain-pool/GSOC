@@ -22,8 +22,6 @@ class ResidualDenseBlock(tf.keras.layers.Layer):
         depthwise_initializer="he_normal",
         bias_initializer="he_normal",
         kernel_size=[3, 3],
-        depthwise_initializer="he_normal",
-        bias_initializer="zeros",
         strides=[1, 1],
         padding="same")
     self._first_call = True
@@ -84,25 +82,22 @@ class RRDBStudent(abstract.Model):
     rrdb_student_config = self.settings["student_config"]["rrdb_student"]
     rrdb_block = partial(ResidualInResidualBlock)
     growth_channels = rrdb_student_config["growth_channels"]
-    depthwise_convolution = partial(
+    depthwise_conv = partial(
         tf.keras.layers.DepthwiseConv2D,
-        depthwise_initializer="he_normal",
-        bias_initializer="he_normal",
         kernel_size=[3, 3],
         strides=[1, 1],
+        use_bias=True,
         padding="same")
     convolution = partial(
         tf.keras.layers.Conv2D,
-        kernel_initializer="he_normal",
-        bias_initializer="he_normal",
         kernel_size=[3, 3],
+        use_bias=True,
         strides=[1, 1],
         padding="same")
     conv_transpose = partial(
         tf.keras.layers.Conv2DTranspose,
         kernel_size=[3, 3],
-        kernel_initializer="he_normal",
-        bias_initializer="he_normal",
+        use_bias=True,
         strides=self._scale_value,
         padding="same")
     self._rrdb_trunk = tf.keras.Sequential(
