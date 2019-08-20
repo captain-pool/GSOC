@@ -51,7 +51,7 @@ def train_and_export(**kwargs):
   lazy.import_("train", parent="libs", return_=False)
   lazy.import_("utils", parent="libs", return_=False)
   globals().update(lazy.import_dict)
-
+  tf.random.set_seed(10)
   teacher_settings = settings.Settings(
       student_settings["teacher_config"], use_student_settings=False)
   stats = settings.Stats(os.path.join(student_settings.path, "stats.yaml"))
@@ -72,20 +72,28 @@ def train_and_export(**kwargs):
     teacher_summary_writer = tf.summary.create_file_writer(
         os.path.join(kwargs["logdir"], "teacher"))
 
-    student_generator = (
-        model.Registry
-        .models[student_settings["student_network"]]())
-    hr_size = tf.convert_to_tensor([1] + student_settings['hr_size'])
-    lr_size = hr_size * tf.convert_to_tensor([1, 1/4, 1/4, 1])
-    logging.debug("Initializing Variables")
-    if not kwargs["export_only"]:
-      student_generator.unsigned_call(tf.random.normal(lr_size))
-    logging.debug("Scaling Variables to 10% of original")
-    for variable in student_generator.trainable_variables:
-      variable.assign(variable * 0.1)
     teacher_generator = teacher.generator(out_channel=3)
     teacher_discriminator = teacher.discriminator(
         batch_size=teacher_settings["batch_size"])
+
+    student_generator = (
+        model.Registry
+        .models[student_settings["student_network"]]())
+
+    hr_size = tf.cast(tf.convert_to_tensor([1] + student_settings['hr_size']), tf.float32)
+    lr_size = tf.cast(hr_size * tf.convert_to_tensor([1, 1/4, 1/4, 1]), tf.int32)
+
+    logging.debug("Initializing Variables")
+    if not kwargs["export_only"]:
+      logging.debug("Student Variables:")
+      student_generator.unsigned_call(tf.random.normal(lr_size))
+      logging.debug("Scaling Variables to 10% of original")
+      for variable in student_generator.trainable_variables:
+        variable.assign(variable * 0.1)
+      logging.debug("Initializing and scaling Teacher Variables:")
+      teacher_generator.unsigned_call(tf.random.normal(lr_size))
+
+
 
     trainer = train.Trainer(
         teacher_generator,
@@ -151,7 +159,7 @@ if __name__ == "__main__":
       help="Increases Verbosity. Repeat to increase more")
 
   FLAGS, unparsed = parser.parse_known_args()
-  log_levels = [logging.WARNING, logging.INFO, logging.DEBUG]
+  log_levels = [logging.FATAL, logging.WARNING, logging.INFO, logging.DEBUG]
   log_level = log_levels[min(FLAGS.verbose, len(log_levels) - 1)]
   logging.set_verbosity(log_level)
   train_and_export(**vars(FLAGS))

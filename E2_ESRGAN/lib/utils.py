@@ -251,6 +251,7 @@ class RDB(tf.keras.layers.Layer):
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self._beta = settings.Settings()["RDB"].get("residual_scale_beta", 0.2)
     self._first_call = True
+
   def call(self, input_):
     x1 = self._lrelu(self._conv2d_layers["conv_1"](input_))
     x2 = self._lrelu(self._conv2d_layers["conv_2"](
