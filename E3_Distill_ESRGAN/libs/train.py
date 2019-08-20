@@ -338,11 +338,11 @@ class Trainer(object):
         tf.summary.scalar(
             "student_loss",
             generator_metric.result(),
-            step=step)
+            step=discriminator_optimizer.iterations)
         tf.summary.scalar(
             "teacher_discriminator_loss",
             discriminator_metric.result(),
-            step=step)
+            step=discriminator_optimizer.iterations)
         tf.summary.scalar("mean_psnr", student_psnr.result(), step=discriminator_optimizer.iterations)
       if self.summary_writer_2:
         with self.summary_writer_2.as_default():
