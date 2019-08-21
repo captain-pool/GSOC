@@ -5,22 +5,32 @@ checkpoint_path:
   comparative_checkpoint: "checkpoints/mse_checkpoints/"
   adversarial_checkpoint: "checkpoints/adversarial_checkpoints/"
 
-hr_size: [256, 256, 3]
+hr_size: [512, 512, 3]
 train:
-  iterations: 1
-  print_step: 100
-  num_steps: 10000
-  checkpoint_step: 100
-  decay_rate: 0.8
-  decay_steps:
-    - 1000
-    - 5000
-    - 9000
-    - 13500
-  balance_factor: 0.2 # alpha of Adversarial Training
+  comparative:
+    print_step: 1000
+    num_steps: 200000
+    checkpoint_step: 2000
+    decay_rate: 0.5
+    decay_steps:
+      - 20000
+      - 50000
+      - 90000
+  adversarial:
+    initial_lr: !!float 5e-5
+    num_steps: 400000
+    print_step: 1000
+    checkpoint_step: 2000
+    decay_rate: 0.5
+    decay_steps:
+      - 20000
+      - 50000
+      - 90000
+    lambda: !!float 5e-3
+    eta: !!float 1e-2
 
-scale_factor: 2
-scale_value: 2
+scale_factor: 1
+scale_value: 4
 student_network: "rrdb_student"
 student_config:
   vgg_student:
@@ -34,9 +44,9 @@ student_config:
   rrdb_student:
     rdb_config:
       depth: 3
-      residual_scale_beta: 0.3
+      residual_scale_beta: 0.2
     rrdb_config:
       rdb_units: 2
-      residual_scale_beta: 0.3
+      residual_scale_beta: 0.2
     trunk_size: 3
     growth_channels: 32
