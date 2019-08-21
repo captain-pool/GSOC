@@ -41,6 +41,10 @@ The model trained on DIV2K dataset on reconstructing 128 x 128 image by a scalin
 ![ESRGAN_DIV2K](https://user-images.githubusercontent.com/13994201/63384084-c7ce5680-c3bb-11e9-96cc-99d9b8cb6804.jpg)
 
 **The model is in State of the Art: 32.6 PSNR on 512 x 512 image patches.**
-
+## Evaluate
+```bash
+python3 evaluate_psnr --lr_files "/path/to/images/*.png" --hr_files "/path/to/images/*.png"
+```
+For options, `python3 evaluate_psnr.py -h`
 ## SavedModel 2.0
 Loadable SavedModel can be found at https://github.com/captain-pool/GSOC/releases/tag/1.0.0

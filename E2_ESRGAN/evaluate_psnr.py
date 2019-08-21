@@ -10,14 +10,16 @@ import tensorflow_hub as hub
 
 
 def build_dataset(
-    directory_path,
+    lr_glob,
+    hr_glob,
     lr_crop_size=[128, 128],
     scale=4,
     total=10000):
   """
     Builds a tf.data.Dataset from directory path.
     Args:
-      directory_path: Path to Set5 Directory
+      lr_glob: Pattern to match Low Resolution images.
+      hr_glob: Pattern to match High resolution images.
       lr_crop_size: Size of Low Resolution images to work on.
       scale: Scaling factor of the images to work on.
       total: Total Number of Sub Images to work on.
@@ -44,46 +46,25 @@ def build_dataset(
           yield (tf.cast(lr_sub_image, tf.float32),
                  tf.cast(hr_sub_image, tf.float32))
 
-  hr_images = tf.io.gfile.glob(
-      os.path.join(
-          directory_path,
-          "image_SRF_%d/*HR.png" %
-          scale))
-  hr_images.extend(
-      tf.io.gfile.glob(
-          os.path.join(
-              directory_path,
-              "image_SRF_%d/*HR.jpg" %
-              scale)))
-  lr_images = tf.io.gfile.glob(
-      os.path.join(
-          directory_path,
-          "image_SRF_%d/*LR.png" %
-          scale))
-  lr_images.extend(
-      tf.io.gfile.glob(
-          os.path.join(
-              directory_path,
-              "image_SRF_%d/*LR.jpg" %
-              scale)))
+  hr_images = tf.io.gfile.glob(hr_glob)
+  lr_images = tf.io.gfile.glob(lr_glob)
   hr_images = sorted(hr_images)
   lr_images = sorted(lr_images)
   dataset = tf.data.Dataset.from_generator(
       functools.partial(_read_images_fn, lr_images, hr_images),
       (tf.float32, tf.float32),
       (tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])))
-  return dataset
+  return dataset, min(total, len(lr_images))
 
 
 def main(**kwargs):
-  total = kwargs["total"]
-  os.environ["TFHUB_DOWNLOAD_PROGRESS"] = "True"
-  model = hub.load(kwargs["model"])
-  dataset = build_dataset(kwargs["datadir"], total=total)
+  dataset, total = build_dataset(kwargs["lr_files"], kwargs["hr_files"], total=kwargs["total"])
   dataset = dataset.batch(kwargs["batch_size"])
   count = itertools.count(start=1, step=kwargs["batch_size"])
+  os.environ["TFHUB_DOWNLOAD_PROGRESS"] = "True"
+  model = hub.load(kwargs["model"])
   metrics = tf.keras.metrics.Mean()
-  for lr_image, hr_image in tqdm(dataset, total=total):
+  for lr_image, hr_image in tqdm(dataset):
     super_res_image = model.call(lr_image)
     super_res_image = tf.clip_by_value(super_res_image, 0, 255)
     metrics(
@@ -116,9 +97,13 @@ if __name__ == "__main__":
       default=16,
       help="Number of images per batch (default: 16)")
   parser.add_argument(
-      "--datadir",
+      "--lr_files",
       default=None,
-      help="Path to the Set5 Dataset")
+      help="Pattern to match low resolution files")
+  parser.add_argument(
+    "--hr_files",
+    default=None,
+    help="Pattern to match High resolution images")
   parser.add_argument(
       "--model",
       default="https://github.com/captain-pool/GSOC/"
@@ -131,7 +116,7 @@ if __name__ == "__main__":
       help="Increase Verbosity of logging")
 
   flags, unknown = parser.parse_known_args()
-  if not flags.datadir:
+  if not (flags.lr_files and flags.hr_files):
     logging.error("Must set flag --datadir")
     sys.exit(1)
   log_levels = [logging.WARN, logging.INFO, logging.DEBUG]
