@@ -260,6 +260,7 @@ class Trainer(object):
         student_psnr(tf.reduce_mean(psnr))
         psnr = tf.image.psnr(teacher_fake, image_hr, max_val=255.0)
         teacher_psnr(tf.reduce_mean(psnr))
+        mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
 
         image_lr = utils.preprocess_input(image_lr)
         image_hr = utils.preprocess_input(image_hr)
@@ -273,9 +274,8 @@ class Trainer(object):
         discriminator_loss = tf.reduce_mean(
             discriminator_loss) * (1.0 / self.batch_size)
         logging.debug("Relativistic Average Loss: Teacher")
-        mse_loss = utils.pixelwise_mse(teacher_fake, student_fake)
-        percep_loss = perceptual_loss(teacher_fake, student_fake)
-        # percep_loss = perceptual_loss(image_hr, student_fake)
+        # percep_loss = perceptual_loss(teacher_fake, student_fake)
+        percep_loss = perceptual_loss(image_hr, student_fake)
         # percep_loss = 0.5 * (teacher_percep_loss + real_percep_loss)
         generator_loss = percep_loss + lambda_ * student_ra_loss + eta * mse_loss
         generator_metric(generator_loss)
