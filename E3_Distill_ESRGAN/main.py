@@ -72,7 +72,7 @@ def train_and_export(**kwargs):
     teacher_summary_writer = tf.summary.create_file_writer(
         os.path.join(kwargs["logdir"], "teacher"))
 
-    teacher_generator = teacher.generator(out_channel=3)
+    teacher_generator = teacher.generator(out_channel=3, first_call=False)
     teacher_discriminator = teacher.discriminator(
         batch_size=teacher_settings["batch_size"])
 
@@ -90,8 +90,8 @@ def train_and_export(**kwargs):
       logging.debug("Scaling Variables to 10% of original")
       for variable in student_generator.trainable_variables:
         variable.assign(variable * 0.1)
-      logging.debug("Initializing and scaling Teacher Variables:")
-      teacher_generator.unsigned_call(tf.random.normal(lr_size))
+      # logging.debug("Initializing Teacher Variables:")
+      # teacher_generator.unsigned_call(tf.random.normal(lr_size))
 
 
 

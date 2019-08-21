@@ -31,9 +31,10 @@ class RRDBNet(tf.keras.Model):
           num_features=32,
           trunk_size=11,
           growth_channel=32,
-          use_bias=True):
+          use_bias=True,
+          first_call=True):
     super(RRDBNet, self).__init__()
-    self.rrdb_block = partial(utils.RRDB, growth_channel)
+    self.rrdb_block = partial(utils.RRDB, growth_channel, first_call=first_call)
     conv = partial(
         tf.keras.layers.Conv2D,
         kernel_size=[3, 3],
