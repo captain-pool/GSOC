@@ -4,17 +4,15 @@ import itertools
 import functools
 import argparse
 from absl import logging
-from tqdm import tqdm
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 import tensorflow_hub as hub
-
+tf.enable_v2_behavior()
 
 def build_dataset(
     lr_glob,
     hr_glob,
     lr_crop_size=[128, 128],
-    scale=4,
-    total=10000):
+    scale=4):
   """
     Builds a tf.data.Dataset from directory path.
     Args:
@@ -22,10 +20,7 @@ def build_dataset(
       hr_glob: Pattern to match High resolution images.
       lr_crop_size: Size of Low Resolution images to work on.
       scale: Scaling factor of the images to work on.
-      total: Total Number of Sub Images to work on.
   """
-
-  counter = itertools.count()
 
   def _read_images_fn(low_res_images, high_res_images):
     for lr_image_path, hr_image_path in zip(low_res_images, high_res_images):
@@ -33,8 +28,6 @@ def build_dataset(
       hr_image = tf.image.decode_image(tf.io.read_file(hr_image_path))
       for height in range(0, lr_image.shape[0] - lr_crop_size[0] + 1, 40):
         for width in range(0, lr_image.shape[1] - lr_crop_size[1] + 1, 40):
-          if next(counter) >= total:
-            raise StopIteration
           lr_sub_image = tf.image.crop_to_bounding_box(
               lr_image,
               height, width,
@@ -54,17 +47,21 @@ def build_dataset(
       functools.partial(_read_images_fn, lr_images, hr_images),
       (tf.float32, tf.float32),
       (tf.TensorShape([None, None, 3]), tf.TensorShape([None, None, 3])))
-  return dataset, min(total, len(lr_images))
+  return dataset
 
 
 def main(**kwargs):
-  dataset, total = build_dataset(kwargs["lr_files"], kwargs["hr_files"], total=kwargs["total"])
+  total = kwargs["total"]
+  dataset = build_dataset(kwargs["lr_files"], kwargs["hr_files"])
   dataset = dataset.batch(kwargs["batch_size"])
   count = itertools.count(start=1, step=kwargs["batch_size"])
   os.environ["TFHUB_DOWNLOAD_PROGRESS"] = "True"
-  model = hub.load(kwargs["model"])
   metrics = tf.keras.metrics.Mean()
-  for lr_image, hr_image in tqdm(dataset):
+  for lr_image, hr_image in dataset:
+    # Loading the model multiple time is the only
+    # way to preserve the quality, since the quality
+    # degrades at every inference for no obvious reaons
+    model = hub.load(kwargs["model"])
     super_res_image = model.call(lr_image)
     super_res_image = tf.clip_by_value(super_res_image, 0, 255)
     metrics(
@@ -74,11 +71,13 @@ def main(**kwargs):
                 hr_image,
                 max_val=256)))
     c = next(count)
-    if not c % 1000:
-      logging.info(
+    if c >= total:
+      break
+    if not (c // 100) % 10:
+      print(
           "%d Images Processed. Mean PSNR yet: %f" %
           (c, metrics.result().numpy()))
-  logging.info(
+  print(
       "%d Images processed. Mean PSNR: %f" %
       (total, metrics.result().numpy()))
   with tf.io.gfile.GFile("PSNR_result.txt", "w") as f:
@@ -90,11 +89,12 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument(
       "--total",
-      default=1000,
+      default=10000,
       help="Total number of sub images to work on. (default: 1000)")
   parser.add_argument(
       "--batch_size",
       default=16,
+      type=int,
       help="Number of images per batch (default: 16)")
   parser.add_argument(
       "--lr_files",
@@ -119,7 +119,7 @@ if __name__ == "__main__":
   if not (flags.lr_files and flags.hr_files):
     logging.error("Must set flag --datadir")
     sys.exit(1)
-  log_levels = [logging.WARN, logging.INFO, logging.DEBUG]
+  log_levels = [logging.FATAL, logging.WARN, logging.INFO, logging.DEBUG]
   log_level = log_levels[min(flags.verbose, len(log_levels) - 1)]
   logging.set_verbosity(log_level)
   main(**vars(flags))
