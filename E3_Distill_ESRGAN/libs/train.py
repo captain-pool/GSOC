@@ -183,7 +183,7 @@ class Trainer(object):
     decay_rate = train_args["decay_rate"]
 
     lambda_ = train_args["lambda"]
-    eta = train_args["eta"]
+    alpha = train_args["alpha"]
 
     generator_metric = tf.keras.metrics.Mean()
     discriminator_metric = tf.keras.metrics.Mean()
@@ -203,23 +203,7 @@ class Trainer(object):
         basepath=self.model_dir,
         use_student_settings=True):
       if export_only:
-        raise ValueError("Checkpoint for this phase not found")
-      if utils.checkpoint_exists(
-          names="comparative_checkpoint",
-          basepath=self.model_dir,
-          use_student_settings=True):
-        hot_start = tf.train.Checkpoint(
-            student_generator=student,
-            student_optimizer=generator_optimizer)
-        status = utils.load_checkpoint(
-            hot_start,
-            "comparative_checkpoint",
-            basepath=self.model_dir,
-            use_student_settings=True)
-        # resetting learning rate for student optimizer.
-        # since loading checkpoint from previous phase
-        # have overwritten the initial learning rate
-        generator_optimizer.learning_rate.assign(train_args["initial_lr"])
+        raise ValueError("Adversarial checkpoints not found")
     else:
       status = utils.load_checkpoint(
           checkpoint,
@@ -274,10 +258,8 @@ class Trainer(object):
         discriminator_loss = tf.reduce_mean(
             discriminator_loss) * (1.0 / self.batch_size)
         logging.debug("Relativistic Average Loss: Teacher")
-        # percep_loss = perceptual_loss(teacher_fake, student_fake)
         percep_loss = perceptual_loss(image_hr, student_fake)
-        # percep_loss = 0.5 * (teacher_percep_loss + real_percep_loss)
-        generator_loss = percep_loss + lambda_ * student_ra_loss + eta * mse_loss
+        generator_loss = lambda_ * percep_loss + alpha * student_ra_loss + (1 - alpha) * mse_loss
         generator_metric(generator_loss)
         logging.debug("Calculated Joint Loss for Generator")
         generator_loss = tf.reduce_mean(
