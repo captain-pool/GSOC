@@ -25,3 +25,5 @@ ShuffleNet ONNX to Tensorflow Hub Module Export
  module = hub.Module("onnx/shufflenet/1")
  result = module(...)
  ```
+ ## Important
+ The module produced is **not** functional. Check issue, https://github.com/captain-pool/GSOC/issues/3
