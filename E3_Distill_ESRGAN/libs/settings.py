@@ -22,9 +22,9 @@ class Settings(object):
   """ Settings class to handle yaml config files """
 
   def __init__(
-          self,
-          filename="config/config.yaml",
-          use_student_settings=False):
+      self,
+      filename="config/config.yaml",
+      use_student_settings=False):
 
     self.__path = os.path.abspath(filename)
 
@@ -57,7 +57,7 @@ class Stats(object):
     self.file = filename
 
   def get(self, index, default=None):
-    self.__data.get(index, default)
+    return self.__data.get(index, default)
 
   def __getitem__(self, index):
     return self.__data[index]
