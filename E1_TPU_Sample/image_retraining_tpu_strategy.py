@@ -49,12 +49,13 @@ class SingleDeviceStrategy(object):
   def experimental_run_v2(self, func, args, kwargs):
     return func(*args, **kwargs)
 
-  def reduce(self, reduction_type, distributed_data, axis): #pylint: disable=unused-argument
+  def reduce(self, reduction_type, distributed_data, axis):  # pylint: disable=unused-argument
     return distributed_data
 
 
 class Model(tf.keras.layers.Model):
   """ Keras Model class for Image Retraining """
+
   def __init__(self, num_classes):
     self._pretrained_layer = hub.KerasLayer(
         PRETRAINED_KERAS_LAYER,
@@ -191,12 +192,14 @@ def train_and_export(**kwargs):
       with summary_writer.as_default():
         tf.summary.scalar(loss_metric.result(), step=optimizer.iterations)
       if step % 100:
-        logging.info("Step: #%f\tLoss: #%f" % (step, loss_metric.result()))
+        logging.info("Step: #%f\tLoss: %f" % (step, loss_metric.result()))
       if step % kwargs["num_steps"]:
         break
-    # Leaving Strategy Scope
+
   logging.info("Exporting Saved Model")
-  tf.saved_model.save(model, os.path.join(kwargs["modeldir"], "model"))
+  export_path = (kwargs["export_path"]
+                 or os.path.join(kwargs["modeldir"], "model"))
+  tf.saved_model.save(model, export_path)
 
 
 if __name__ == "__main__":
@@ -224,15 +227,25 @@ if __name__ == "__main__":
   parser.add_argument(
       "num_steps",
       default=1000,
+      type=int,
       help="Number of Steps to train the model for")
+  parser.add_argument(
+      "export_path",
+      default=None,
+      help="Explicitly specify the export path of the model."
+      "Else `modeldir/model` wil be used.")
   parser.add_argument(
       "--verbose",
       "-v",
       default=0,
+      type=int,
       action="count",
       help="increase verbosity. multiple tags to increase more")
   flags, unknown = parser.parse_known_args()
   log_levels = [logging.FATAL, logging.WARNING, logging.INFO, logging.DEBUG]
   log_level = log_levels[min(flags.verbose, len(log_levels) - 1)]
+  if not flags.modeldir:
+    logging.fatal("`--modeldir` must be specified")
+    sys.exit(1)
   logging.set_verbosity(log_level)
   train_and_export(**vars(flags))
