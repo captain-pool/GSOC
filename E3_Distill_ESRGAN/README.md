@@ -55,14 +55,14 @@ Specifically,
 Trained Saved Model and TF Lite File
 -----------------------------------------
 
-#### Input Specification of the Saved Model
+#### Specification of the Saved Model
 Input Dimension: `[None, 180, 320, 3]`
 
 Input Data Type: `Float32`
 
 Output Dimension: `[None, 180, 320, 3]`
 
-#### Input Specification of TF Lite
+#### Specification of TF Lite
 Input Dimension: `[1, 180, 320, 3]`
 
 Input Data Type: `Float32`
