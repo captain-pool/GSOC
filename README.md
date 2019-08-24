@@ -1,6 +1,8 @@
 # GSOC
-Repository for Google Summer of Code 2019
+Repository for Google Summer of Code 2019 at TensorFlow
 ---------------------------------------------
+### GSOC Project Page
+https://summerofcode.withgoogle.com/projects/#4662790671826944
 ### Mentors
 - Sachin Joglekar ([@srjoglekar246](https://github.com/srjoglekar246))
 - Vojtech Bardiovsky ([@vbardiovskyg](https://github.com/vbardiovskyg))
@@ -15,4 +17,4 @@ Repository for Google Summer of Code 2019
 |E2|Adding Support to SavedModel 2.0 in `saved_model_cli`|[Here](https://github.com/tensorflow/tensorflow/pull/30752)|:heavy_check_mark:|
 |E3|Add Sample Notebook demonstrating usage of ESRGAN TF Hub Module|[Here](https://github.com/tensorflow/hub/pull/352)|:construction:|
 |E3|Knowledge Distillation of ESRGAN|[Here](E3_Distill_ESRGAN)|:heavy_check_mark:|
-|E3| Proof of Concept Video Player for Real Time Video Frame Super Resolution|[Here](E3_Streamer)|:heavy_check_mark:|
+|E3| Proof of concept video player for real time video frame Super Resolution|[Here](E3_Streamer)|:heavy_check_mark:|
