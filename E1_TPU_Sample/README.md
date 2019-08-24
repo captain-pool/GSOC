@@ -17,7 +17,7 @@
 Launching Instance and VM
 ---------------------------
 - Open Google Cloud Shell
-- `ctpu up -tf-version nightly`
+- `ctpu up -tf-version 1.14`
 - If cloud bucket is not setup automatically, create a cloud storage bucket
 with the same name as TPU and the VM
 - enable HTTP traffic for the VM instance
