@@ -15,6 +15,11 @@ Results
 **Mean PSNR Achieved**: 28.2
 
 **Sample**:
+
+Input Image Shape: 180 x 320
+
+Output image shape: 720 x 1280
+
 ![esrgan](https://user-images.githubusercontent.com/13994201/63640629-251a1e80-c6c0-11e9-98bc-04432c7064e2.jpg "ESRGAN")
 
 **PSNR of the Image**: 30.462
@@ -25,6 +30,11 @@ Results
 **Mean PSNR Achieved**: 25.3
 
 **Sample**
+
+Input Image Shape: 180 x 320
+
+Output image shape: 720 x 1280
+
 ![compressed_esrgan](https://user-images.githubusercontent.com/13994201/63640526-1121ed00-c6bf-11e9-99f5-0b48069fe784.jpg "Compressed ESRGAN")
 **PSNR of the Image**: 26.942
 
@@ -50,7 +60,11 @@ Input Dimension: `[None, 180, 320, 3]`
 
 Input Data Type: `Float32`
 
+Output Dimension: `[None, 180, 320, 3]`
+
 #### Input Specification of TF Lite
 Input Dimension: `[1, 180, 320, 3]`
 
 Input Data Type: `Float32`
+
+Output Dimension: `[1, 720, 1280, 3]`
