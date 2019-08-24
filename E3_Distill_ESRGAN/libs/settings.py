@@ -62,6 +62,9 @@ class Stats(object):
   def __getitem__(self, index):
     return self.__data[index]
 
+  def __repr__(self):
+    return "Stats(" + str(self.__data) + ")"
+
   def __setitem__(self, index, data):
     self.__data[index] = data
     with open(self.file, "w") as file_:

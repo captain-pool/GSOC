@@ -233,7 +233,7 @@ class SingleDeviceStrategy(object):
 class RDB(tf.keras.layers.Layer):
   """ Residual Dense Block Layer """
 
-  def __init__(self, out_features=32, bias=True):
+  def __init__(self, out_features=32, bias=True, first_call=True):
     super(RDB, self).__init__()
     _create_conv2d = partial(
         tf.keras.layers.Conv2D,
@@ -250,7 +250,7 @@ class RDB(tf.keras.layers.Layer):
         "conv_5": _create_conv2d()}
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
     self._beta = settings.Settings()["RDB"].get("residual_scale_beta", 0.2)
-    self._first_call = True
+    self._first_call = first_call
 
   def call(self, input_):
     x1 = self._lrelu(self._conv2d_layers["conv_1"](input_))
@@ -273,11 +273,11 @@ class RDB(tf.keras.layers.Layer):
 class RRDB(tf.keras.layers.Layer):
   """ Residual in Residual Block Layer """
 
-  def __init__(self, out_features=32):
+  def __init__(self, out_features=32, first_call=True):
     super(RRDB, self).__init__()
-    self.RDB1 = RDB(out_features)
-    self.RDB2 = RDB(out_features)
-    self.RDB3 = RDB(out_features)
+    self.RDB1 = RDB(out_features, first_call=first_call)
+    self.RDB2 = RDB(out_features, first_call=first_call)
+    self.RDB3 = RDB(out_features, first_call=first_call)
     self.beta = settings.Settings()["RDB"].get("residual_scale_beta", 0.2)
 
   def call(self, input_):
