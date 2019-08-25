@@ -3,6 +3,7 @@ import argparse
 import tensorflow as tf
 import tensorflow_hub as hub
 import os
+from PIL import Image
 import multiprocessing
 from functools import partial
 import time
@@ -49,7 +50,7 @@ class Player(object):
     pyaudio = pya.PyAudio()
     issmallscreen = 1 if saved_model or tflite else 0.25
     self.screen = pygame.display.set_mode(
-        (int(1080 * issmallscreen),
+        (int(1280 * issmallscreen),
          int(720 * issmallscreen)), 0, 32)
     self.stream = pyaudio.open(
         format=pya.paFloat32,
@@ -80,8 +81,7 @@ class Player(object):
     if self.saved_model:
       start = time.time()
       frame = self.saved_model.call(frame)
-      logging.debug("Super Resolving Time: %f" % (time.time() - start))
-    #frame = tf.squeeze(tf.cast(tf.clip_by_value(frame, 0, 255), tf.uint8))
+      logging.debug("[SAVED_MODEL] Super Resolving Time: %f" % (time.time() - start))
     logging.debug("Returning Modified Frames")
     return np.squeeze(np.clip(frame.numpy(), 0, 255).astype("uint8"))
 
@@ -98,12 +98,12 @@ class Player(object):
       logging.debug("Fetching Video Frame. %f" % (time.time() - loop_time))
       loop_time = time.time()
       frame = next(self.video_iterator)
-      frame = tf.image.resize(
-          frame,
-          size=[
-              720 // 4,
-              1080 // 4],
-          method="bicubic")
+      frame = np.asarray(
+          Image.fromarray(frame)
+          .resize(
+              [1280 // 4, 720 // 4],
+              Image.BICUBIC), dtype="float32")
+
       frames.append(tf.expand_dims(frame, 0))
     logging.debug("Frame Fetching Time: %f" % (time.time() - start))
     if self.interpreter and not self.saved_model:
