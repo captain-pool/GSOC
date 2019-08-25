@@ -62,9 +62,13 @@ Input Data Type: `Float32`
 
 Output Dimension: `[None, 180, 320, 3]`
 
+TensorFlow loadable link: https://github.com/captain-pool/GSOC/releases/download/2.0.0/compressed_esrgan.tar.gz
+
 #### Specification of TF Lite
 Input Dimension: `[1, 180, 320, 3]`
 
 Input Data Type: `Float32`
 
 Output Dimension: `[1, 720, 1280, 3]`
+
+TensorFlow Lite: https://github.com/captain-pool/GSOC/releases/download/2.0.0/compressed_esrgan.tflite
