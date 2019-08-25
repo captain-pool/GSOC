@@ -20,11 +20,12 @@ from __future__ import print_function
 import os
 
 import argparse
-import tensorflow.compat.v2 as tf
+from absl import logging
+import tensorflow as tf
 import tensorflow_hub as hub
 import tensorflow_datasets as tfds
 
-tf.enable_v2_behavior()
+tf.compat.v2.enable_v2_behavior()
 os.environ["TFHUB_DOWNLOAD_PROGRESS"] = "True"
 
 PRETRAINED_KERAS_LAYER = "https://tfhub.dev/google/tf2-preview/inception_v3/feature_vector/4"
@@ -53,10 +54,12 @@ class SingleDeviceStrategy(object):
     return distributed_data
 
 
-class Model(tf.keras.layers.Model):
+class Model(tf.keras.models.Model):
   """ Keras Model class for Image Retraining """
 
   def __init__(self, num_classes):
+    super(Model, self).__init__()
+    logging.info("Loading Pretrained Image Vectorizer")
     self._pretrained_layer = hub.KerasLayer(
         PRETRAINED_KERAS_LAYER,
         output_shape=[2048],
@@ -66,7 +69,7 @@ class Model(tf.keras.layers.Model):
   @tf.function(
       input_signature=[
           tf.TensorSpec(
-              shape=[None, None, 3],
+              shape=[None, None, None, 3],
               dtype=tf.float32)])
   def call(self, inputs):
     return self.unsigned_call(inputs)
@@ -82,7 +85,7 @@ def connect_to_tpu(tpu=None):
     tf.config.experimental_connect_to_host(cluster_resolver.get_master())
     tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
     strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
-    return strategy, "/task:1"
+    return strategy, "/job:worker"
   return SingleDeviceStrategy(), ""
 
 
@@ -99,20 +102,21 @@ def load_dataset(name, datadir, batch_size=32, shuffle=None):
       name,
       try_gcs=True,
       data_dir=datadir,
+      split="train",
       as_supervised=True,
       with_info=True)
   num_classes = info.features["label"].num_classes
 
   def _scale_fn(image, label):
     image = tf.cast(image, tf.float32)
-    label = tf.cast(image, tf.float32)
     image = image / 127.5
     image -= 1.
     label = tf.one_hot(label, num_classes)
+    label = tf.cast(label, tf.float32)
     return image, label
 
   options = tf.data.Options()
-  if not hasattr(tf.data.Options.auto_shard):
+  if not hasattr(tf.data.Options, "auto_shard"):
     options.experimental_distribute.auto_shard = False
   else:
     options.auto_shard = False
@@ -153,8 +157,7 @@ def train_and_export(**kwargs):
   os.environ["TFHUB_CACHE_DIR"] = os.path.join(
       kwargs["modeldir"], "tfhub_cache")
 
-  strategy, device = connect_to_tpu(kwargs["tpu"])
-
+  strategy, device = connect_to_tpu((not kwargs["export_only"]) and kwargs["tpu"])
   with tf.device(device), strategy.scope():
     summary_writer = tf.summary.create_file_writer(kwargs["logdir"])
     dataset, num_classes = load_dataset(
@@ -166,15 +169,19 @@ def train_and_export(**kwargs):
     model = Model(num_classes)
     loss_metric = tf.keras.metrics.Mean()
     optimizer = tf.keras.optimizers.Adam()
-
+    ckpt = tf.train.Checkpoint(model=model)
     def distributed_step(images, labels):
       with tf.GradientTape() as tape:
+        logging.info("Taking predictions")
         predictions = model.unsigned_call(images)
+        logging.info("Calculating loss")
         loss = tf.nn.sigmoid_cross_entropy_with_logits(labels, predictions)
         loss_metric(loss)
         loss = loss * (1.0 / BATCH_SIZE)
+      logging.info("Calculating gradients")
       gradient = tape.gradient(loss, model.trainable_variables)
-      train_op = optimizer.apply_gradients(gradient, model.trainable_variables)
+      logging.info("Applying gradients")
+      train_op = optimizer.apply_gradients(zip(gradient, model.trainable_variables))
       with tf.control_dependencies([train_op]):
         return tf.cast(optimizer.iterations, tf.float32)
 
@@ -185,60 +192,70 @@ def train_and_export(**kwargs):
       step = strategy.reduce(
           tf.distribute.ReduceOp.MEAN, distributed_metric, axis=None)
       return step
-
-    while True:
+    if not kwargs["export_only"]:
+      logging.info("Starting Training")
+    while not kwargs["export_only"]:
       image, label = next(dataset)
-      step = train_step(image, label)
+      step = tf.cast(train_step(image, label), tf.uint8)
       with summary_writer.as_default():
-        tf.summary.scalar(loss_metric.result(), step=optimizer.iterations)
+        tf.summary.scalar("loss", loss_metric.result(), step=optimizer.iterations)
       if step % 100:
         logging.info("Step: #%f\tLoss: %f" % (step, loss_metric.result()))
-      if step % kwargs["num_steps"]:
+      if step >= kwargs["num_steps"]:
+        ckpt.save(file_prefix=os.path.join(kwargs["modeldir"], "checkpoint"))
         break
-
-  logging.info("Exporting Saved Model")
-  export_path = (kwargs["export_path"]
-                 or os.path.join(kwargs["modeldir"], "model"))
-  tf.saved_model.save(model, export_path)
+    logging.info("Exporting Saved Model")
+    export_path = (kwargs["export_path"]
+                   or os.path.join(kwargs["modeldir"], "model"))
+    ckpt.restore(
+        tf.train.latest_checkpoint(
+          os.path.join(kwargs["modeldir"], "checkpoint")))
+    logging.info("Consuming checkpoint and tracing function")
+    model(tf.random.normal([1, 200, 200, 3]))
+    tf.saved_model.save(model, export_path)
 
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument(
-      "dataset",
+      "--dataset",
       default=None,
       help="Name of the Dataset to use")
   parser.add_argument(
-      "datadir",
+      "--datadir",
       default=None,
       help="Directory to store the downloaded Dataset")
   parser.add_argument(
-      "modeldir",
+      "--modeldir",
       default=None,
       help="Directory to store the SavedModel to")
   parser.add_argument(
-      "logdir",
+      "--logdir",
       default=None,
       help="Directory to store the Tensorboard logs")
   parser.add_argument(
-      "tpu",
+      "--tpu",
       default=None,
       help="name or GRPC address of the TPU")
   parser.add_argument(
-      "num_steps",
+      "--num_steps",
       default=1000,
       type=int,
       help="Number of Steps to train the model for")
   parser.add_argument(
-      "export_path",
+      "--export_path",
       default=None,
       help="Explicitly specify the export path of the model."
       "Else `modeldir/model` wil be used.")
   parser.add_argument(
+      "--export_only",
+      default=False,
+      action="store_true",
+      help="Only export the SavedModel from presaved checkpoints")
+  parser.add_argument(
       "--verbose",
       "-v",
       default=0,
-      type=int,
       action="count",
       help="increase verbosity. multiple tags to increase more")
   flags, unknown = parser.parse_known_args()
