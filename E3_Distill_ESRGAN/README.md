@@ -1,5 +1,5 @@
 # GAN Distillation on Enhanced Super Resolution GAN
-Link to ESRGAN Tranining Codes: [Click Here](E2_ESRGAN)
+Link to ESRGAN Tranining Codes: [Click Here](../E2_ESRGAN)
 
 Knowledge Distillation on Enhanced Super Resolution GAN to perform Super Resolution on model with much smaller number of
 variables.
