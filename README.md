@@ -7,6 +7,8 @@ https://summerofcode.withgoogle.com/projects/#4662790671826944
 - Sachin Joglekar ([@srjoglekar246](https://github.com/srjoglekar246))
 - Vojtech Bardiovsky ([@vbardiovskyg](https://github.com/vbardiovskyg))
 
+### Wikis Written
+- Training TF2.0 models on TPUs: https://github.com/captain-pool/GSOC/wiki/Training-TF-2.0-Models-on-TPUs
 ### Tasks
 |Evaluation|Task|Link|Done|
 |:-:|:-:|:-:|:-:|
