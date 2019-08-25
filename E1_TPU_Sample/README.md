@@ -45,14 +45,29 @@ To view Tensorboard, Browse to the Public IP of the VM Instance
 
 Running the Code:
 ----------------------
+#### Train The Model
+
 ```bash
 $ python3 image_retraining_tpu.py --tpu $CTPU_NAME --use_tpu \
 --modeldir gs://$CTPU_NAME/modeldir \
 --datadir gs://$CTPU_NAME/datadir \
 --logdir gs://$CTPU_NAME/logdir \
 --num_steps 2000 \
---export_path modeldir/horses_or_humans \
 --dataset horses_or_humans
+```
+Training Saves one single checkpoint at the end of training. This checkpoint can be loaded up
+later to export a SavedModel from it.
+
+#### Export Model
+
+```bash
+$ python3 image_retraining_tpu.py --tpu $CTPU_NAME --use_tpu \
+--modeldir gs://$CTPU_NAME/modeldir \
+--datadir gs://$CTPU_NAME/datadir \
+--logdir gs://$CTPU_NAME/logdir \
+--dataset horses_or_humans \
+--export_only \
+--export_path modeldir/model
 ```
 Exporting SavedModel of trained model
 ----------------------------
