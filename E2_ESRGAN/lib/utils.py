@@ -71,7 +71,7 @@ def interpolate_generator(
   if not tf.nest.is_nested(dimension):
     size = [dimension, dimension]
   logging.debug("Interpolating generator. Alpha: %f" % alpha)
-  optimizer = partial(tf.optimizers.Adam)
+  optimizer = partial(tf.keras.optimizers.Adam)
   gan_generator = generator_fn()
   psnr_generator = generator_fn()
   # building generators
