@@ -13,7 +13,7 @@ class ResidualDenseBlock(tf.keras.layers.Layer):
     (https://arxiv.org/pdf/1809.00219.pdf)
   """
 
-  def __init__(self):
+  def __init__(self, first_call=True):
     super(ResidualDenseBlock, self).__init__()
     self.settings = settings.Settings(use_student_settings=True)
     rdb_config = self.settings["student_config"]["rrdb_student"]["rdb_config"]
@@ -24,7 +24,7 @@ class ResidualDenseBlock(tf.keras.layers.Layer):
         kernel_size=[3, 3],
         strides=[1, 1],
         padding="same")
-    self._first_call = True
+    self._first_call = first_call
     self._conv_layers = {
         "conv_%d" % index: convolution()
         for index in range(1, rdb_config["depth"])}
@@ -53,12 +53,12 @@ class ResidualInResidualBlock(tf.keras.layers.Layer):
     (https://arxiv.org/pdf/1809.00219.pdf)
   """
 
-  def __init__(self):
+  def __init__(self, first_call=True):
     super(ResidualInResidualBlock, self).__init__()
     self.settings = settings.Settings(use_student_settings=True)
     rrdb_config = self.settings["student_config"]["rrdb_student"]["rrdb_config"]
     self._rdb_layers = {
-        "rdb_%d" % index: ResidualDenseBlock()
+        "rdb_%d" % index: ResidualDenseBlock(first_call=first_call)
         for index in range(1, rrdb_config["rdb_units"])}
     self._beta = rrdb_config["residual_scale_beta"]
 
@@ -75,12 +75,12 @@ class RRDBStudent(abstract.Model):
     (https://arxiv.org/pdf/1809.00219.pdf)
   """
 
-  def init(self):
+  def init(self, first_call=True):
     self.settings = settings.Settings(use_student_settings=True)
     self._scale_factor = self.settings["scale_factor"]
     self._scale_value = self.settings["scale_value"]
     rrdb_student_config = self.settings["student_config"]["rrdb_student"]
-    rrdb_block = partial(ResidualInResidualBlock)
+    rrdb_block = partial(ResidualInResidualBlock, first_call=first_call)
     growth_channels = rrdb_student_config["growth_channels"]
     depthwise_conv = partial(
         tf.keras.layers.DepthwiseConv2D,

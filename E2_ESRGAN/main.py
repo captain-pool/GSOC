@@ -61,12 +61,11 @@ def main(**kwargs):
     summary_writer_2 = tf.summary.create_file_writer(
         os.path.join(kwargs["log_dir"], "phase2"))
     # profiler.start_profiler_server(6009)
-    generator = model.RRDBNet(out_channel=3)
     discriminator = model.VGGArch(batch_size=sett["batch_size"], num_features=64)
-    # Intiating Convolutions
-    logging.debug("Initiating Convolutions")
-    generator.unsigned_call(tf.random.normal([1, 128, 128, 3]))
     if not kwargs["export_only"]:
+      generator = model.RRDBNet(out_channel=3)
+      logging.debug("Initiating Convolutions")
+      generator.unsigned_call(tf.random.normal([1, 128, 128, 3]))
       training = train.Trainer(
           summary_writer=summary_writer_1,
           summary_writer_2=summary_writer_2,
@@ -89,7 +88,7 @@ def main(**kwargs):
   if Stats["train_step_1"] and Stats["train_step_2"]:
     # Attempting to save "Interpolated" Model as SavedModel2.0
     interpolated_generator = utils.interpolate_generator(
-        partial(model.RRDBNet, out_channel=3),
+        partial(model.RRDBNet, out_channel=3, first_call=False),
         discriminator,
         sett["interpolation_parameter"],
         [720, 1080],

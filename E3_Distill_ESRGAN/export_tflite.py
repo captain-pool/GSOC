@@ -73,7 +73,7 @@ def export_tflite(config="", modeldir="", mode="", **kwargs):
   sett = settings.Settings(config, use_student_settings=True)
   stats = settings.Stats(os.path.join(sett.path, "stats.yaml"))
   student_name = sett["student_network"]
-  student_generator = model.Registry.models[student_name]()
+  student_generator = model.Registry.models[student_name](first_call=False)
   ckpt = tf.train.Checkpoint(student_generator=student_generator)
   logging.info("Initiating Variables. Tracing Function.")
   student_generator(tf.random.normal([1, 180, 320, 3]))
