@@ -89,7 +89,7 @@ def main(**kwargs):
   if Stats["train_step_1"] and Stats["train_step_2"]:
     # Attempting to save "Interpolated" Model as SavedModel2.0
     interpolated_generator = utils.interpolate_generator(
-        partial(model.RRDBNet, out_channel=3),
+        partial(model.RRDBNet, out_channel=3, first_call=False),
         discriminator,
         sett["interpolation_parameter"],
         [720, 1080],

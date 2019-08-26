@@ -46,12 +46,12 @@ def load_checkpoint(checkpoint, training_phase, basepath=""):
 
 
 def interpolate_generator(
-        generator_fn,
-        discriminator,
-        alpha,
-        dimension,
-        factor=4,
-        basepath=""):
+    generator_fn,
+    discriminator,
+    alpha,
+    dimension,
+    factor=4,
+    basepath=""):
   """ Interpolates between the weights of the PSNR model and GAN model
 
        Refer to Section 3.4 of https://arxiv.org/pdf/1809.00219.pdf (Xintao et. al.)
@@ -87,12 +87,16 @@ def interpolate_generator(
       G_optimizer=optimizer(),
       D=discriminator,
       D_optimizer=optimizer())
+
+
   load_checkpoint(phase_1_ckpt, "phase_1", basepath)
   load_checkpoint(phase_2_ckpt, "phase_2", basepath)
 
   # Consuming Checkpoint
+  logging.debug("Consuming Variables: Adervsarial generator")
   gan_generator(tf.random.normal(
       [1, size[0] // factor, size[1] // factor, 3]))
+  logging.debug("Consuming Variables: PSNR generator")
   psnr_generator(tf.random.normal(
       [1, size[0] // factor, size[1] // factor, 3]))
 
@@ -103,10 +107,13 @@ def interpolate_generator(
   return gan_generator
 
 # Losses
+
+
 def preprocess_input(image):
-  image = image[...,::-1]
+  image = image[..., ::-1]
   mean = -tf.constant([103.939, 116.779, 123.68])
   return tf.nn.bias_add(image, mean)
+
 
 def PerceptualLoss(weights=None, input_shape=None, loss_type="L1"):
   """ Perceptual Loss using VGG19

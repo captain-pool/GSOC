@@ -83,17 +83,8 @@ def train_and_export(**kwargs):
     hr_size = tf.cast(tf.convert_to_tensor([1] + student_settings['hr_size']), tf.float32)
     lr_size = tf.cast(hr_size * tf.convert_to_tensor([1, 1/4, 1/4, 1]), tf.int32)
 
-    logging.debug("Initializing Variables")
-    if not kwargs["export_only"]:
-      logging.debug("Student Variables:")
-      student_generator.unsigned_call(tf.random.normal(lr_size))
-      logging.debug("Scaling Variables to 10% of original")
-      for variable in student_generator.trainable_variables:
-        variable.assign(variable * 0.1)
-      # logging.debug("Initializing Teacher Variables:")
-      # teacher_generator.unsigned_call(tf.random.normal(lr_size))
-
-
+    logging.debug("Initializing Convolutions")
+    student_generator.unsigned_call(tf.random.normal(lr_size))
 
     trainer = train.Trainer(
         teacher_generator,
