@@ -91,9 +91,9 @@ def interpolate_generator(
   load_checkpoint(phase_2_ckpt, "phase_2", basepath)
 
   # Consuming Checkpoint
-  gan_generator(tf.random.normal(
+  gan_generator.predict(tf.random.normal(
       [1, size[0] // factor, size[1] // factor, 3]))
-  psnr_generator(tf.random.normal(
+  psnr_generator.predict(tf.random.normal(
       [1, size[0] // factor, size[1] // factor, 3]))
 
   for variables_1, variables_2 in zip(

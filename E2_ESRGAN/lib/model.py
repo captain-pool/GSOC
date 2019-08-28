@@ -10,7 +10,7 @@ from lib import utils
 """
 
 
-class RRDBNet(tf.train.Checkpoint):
+class RRDBNet(tf.keras.Model):
   """ Residual in Residual Network consisting of:
       - Convolution Layers
       - Residual in Residual Block as the trunk of the model
@@ -57,11 +57,11 @@ class RRDBNet(tf.train.Checkpoint):
     self.conv_last_2 = conv(out_channel)
     self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
 
-  @tf.function(
-      input_signature=[
-          tf.TensorSpec(shape=[None, None, None, 3],
-                        dtype=tf.float32)])
-  def __call__(self, inputs):
+  # @tf.function(
+  #    input_signature=[
+  #        tf.TensorSpec(shape=[None, None, None, 3],
+  #                      dtype=tf.float32)])
+  def call(self, inputs):
     return self.unsigned_call(inputs)
 
   def unsigned_call(self, input_):
