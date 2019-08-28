@@ -10,7 +10,7 @@ from lib import utils
 """
 
 
-class RRDBNet(tf.keras.Model):
+class RRDBNet(tf.train.Checkpoint):
   """ Residual in Residual Network consisting of:
       - Convolution Layers
       - Residual in Residual Block as the trunk of the model
@@ -33,7 +33,6 @@ class RRDBNet(tf.keras.Model):
           growth_channel=32,
           use_bias=True,
           first_call=True):
-    super(RRDBNet, self).__init__()
     self.rrdb_block = partial(utils.RRDB, growth_channel, first_call=first_call)
     conv = partial(
         tf.keras.layers.Conv2D,
@@ -62,7 +61,7 @@ class RRDBNet(tf.keras.Model):
       input_signature=[
           tf.TensorSpec(shape=[None, None, None, 3],
                         dtype=tf.float32)])
-  def call(self, inputs):
+  def __call__(self, inputs):
     return self.unsigned_call(inputs)
 
   def unsigned_call(self, input_):
