@@ -26,7 +26,7 @@ reconstruction.
 import tensorflow_hub as hub
 import tensorflow as tf
 model = hub.load("https://github.com/captain-pool/GSOC/releases/download/1.0.0/esrgan.tar.gz")
-super_resolution = model.call(LOW_RESOLUTION_IMAGE_OF_SHAPE=[BATCH, HEIGHT, WIDTH, 3])
+super_resolution = model(LOW_RESOLUTION_IMAGE_OF_SHAPE=[BATCH, HEIGHT, WIDTH, 3])
 # Output Shape: [BATCH, 4 x HEIGHT, 4 x WIDTH, 3]
 # Output DType: tf.float32.
 # NOTE:
