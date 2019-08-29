@@ -76,7 +76,7 @@ def export_tflite(config="", modeldir="", mode="", **kwargs):
   student_generator = model.Registry.models[student_name](first_call=False)
   ckpt = tf.train.Checkpoint(student_generator=student_generator)
   logging.info("Initiating Variables. Tracing Function.")
-  student_generator(tf.random.normal([1, 180, 320, 3]))
+  student_generator.predict(tf.random.normal([1, 180, 320, 3]))
   if stats.get(mode):
     status = utils.load_checkpoint(
         ckpt,

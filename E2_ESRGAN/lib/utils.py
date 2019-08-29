@@ -93,11 +93,17 @@ def interpolate_generator(
   load_checkpoint(phase_2_ckpt, "phase_2", basepath)
 
   # Consuming Checkpoint
-  logging.debug("Consuming Variables: Adervsarial generator")
-  gan_generator(tf.random.normal(
+  logging.debug("Consuming Variables: Adervsarial generator") 
+  gan_generator.unsigned_call(tf.random.normal(
       [1, size[0] // factor, size[1] // factor, 3]))
+  input_layer = tf.keras.Input(shape=[None, None, 3], name="input_0")
+  output = gan_generator(input_layer)
+  gan_generator = tf.keras.Model(
+      inputs=[input_layer],
+      outputs=[output])
+
   logging.debug("Consuming Variables: PSNR generator")
-  psnr_generator(tf.random.normal(
+  psnr_generator.unsigned_call(tf.random.normal(
       [1, size[0] // factor, size[1] // factor, 3]))
 
   for variables_1, variables_2 in zip(
