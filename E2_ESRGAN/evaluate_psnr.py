@@ -117,7 +117,7 @@ if __name__ == "__main__":
 
   flags, unknown = parser.parse_known_args()
   if not (flags.lr_files and flags.hr_files):
-    logging.error("Must set flag --datadir")
+    logging.error("Must set flag --lr_files and --hr_files")
     sys.exit(1)
   log_levels = [logging.FATAL, logging.WARN, logging.INFO, logging.DEBUG]
   log_level = log_levels[min(flags.verbose, len(log_levels) - 1)]
