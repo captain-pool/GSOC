@@ -108,7 +108,7 @@ def train_and_export(**kwargs):
       if not kwargs["export_only"]:
         stats["adversarial"] = True
   # Tracing Graph to put input signature
-  _ = student_generator(
+  _ = student_generator.predict(
       tf.random.normal([1, 180, 320, 3]))
   tf.saved_model.save(
       student_generator,

@@ -111,11 +111,6 @@ class RRDBStudent(abstract.Model):
     self._conv_last = depthwise_conv()
     self._lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
 
-  @tf.function(
-      input_signature=[
-          tf.TensorSpec(
-              shape=[None, 180, 320, 3],    # 720x1280 Images
-              dtype=tf.float32)])
   def call(self, inputs):
     return self.unsigned_call(inputs)
 

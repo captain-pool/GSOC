@@ -58,10 +58,10 @@ class RRDBNet(tf.keras.Model):
     self.conv_last_2 = conv(out_channel)
     self.lrelu = tf.keras.layers.LeakyReLU(alpha=0.2)
 
-  @tf.function(
-      input_signature=[
-          tf.TensorSpec(shape=[None, None, None, 3],
-                        dtype=tf.float32)])
+  # @tf.function(
+  #    input_signature=[
+  #        tf.TensorSpec(shape=[None, None, None, 3],
+  #                      dtype=tf.float32)])
   def call(self, inputs):
     return self.unsigned_call(inputs)
 
