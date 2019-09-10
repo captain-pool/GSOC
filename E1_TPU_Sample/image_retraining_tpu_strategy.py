@@ -85,7 +85,7 @@ def connect_to_tpu(tpu=None):
     tf.config.experimental_connect_to_host(cluster_resolver.get_master())
     tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
     strategy = tf.distribute.experimental.TPUStrategy(cluster_resolver)
-    return strategy, "/job:worker"
+    return strategy, "/task:1" if os.environ.get("COLAB_TPU_ADDR") else "/job:worker"
   return SingleDeviceStrategy(), ""
 
 
