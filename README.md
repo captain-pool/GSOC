@@ -20,3 +20,7 @@ https://summerofcode.withgoogle.com/projects/#4662790671826944
 |E3|Add Sample Notebook demonstrating usage of ESRGAN TF Hub Module|[Here](https://github.com/tensorflow/hub/pull/352)|:construction:|
 |E3|Knowledge Distillation of ESRGAN|[Here](E3_Distill_ESRGAN)|:heavy_check_mark:|
 |E3| Proof of concept video player for real time video frame Super Resolution|[Here](E3_Streamer)|:heavy_check_mark:|
+
+## UPDATE
+ESRGAN just got published on [tfhub.dev](https://tfhub.dev)
+Link: [https://tfhub.dev/captain-pool/esrgan-tf2/1](https://tfhub.dev/captain-pool/esrgan-tf2/1)
