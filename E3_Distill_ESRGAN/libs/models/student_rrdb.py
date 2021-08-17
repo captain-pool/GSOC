@@ -33,8 +33,8 @@ class ResidualDenseBlock(tf.keras.layers.Layer):
 
   def call(self, inputs):
     intermediates = [inputs]
+    residual_junction = tf.math.add_n(intermediates)
     for layer_name in self._conv_layers:
-      residual_junction = tf.math.add_n(intermediates)
       raw_intermediate = self._conv_layers[layer_name](residual_junction)
       activated_intermediate = self._lrelu(raw_intermediate)
       intermediates.append(activated_intermediate)
